@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Anton", "Archivo Black", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  /*
+   * Light, warm neutral scale. Names run 950 (page cream) -> 50 (near-black
+   * text), same direction the app was originally built dark-first with, so
+   * every existing `bg-base-950` / `text-base-50` usage still means "the
+   * furthest-back surface" / "the most prominent text" after this flip.
+   * One deliberate exception: base-900 (elevated white card) is brighter
+   * than base-950 (cream page) — cards sit visibly "on top of" the page.
+   */
+  --color-base-950: #f3f1e8;
+  --color-base-900: #ffffff;
+  --color-base-850: #f8f6ef;
+  --color-base-800: #ebe7da;
+  --color-base-700: #ddd8c6;
+  --color-base-600: #c3bda6;
+  --color-base-500: #928c76;
+  --color-base-400: #6f6a57;
+  --color-base-300: #555141;
+  --color-base-200: #373426;
+  --color-base-100: #201e15;
+  --color-base-50: #100f09;
+
+  /* Brand accent — lime. Used only as a fill (buttons, highlight pills,
+     active brand moments) paired with dark text; never as small text. */
+  --color-accent: #d7f24c;
+  --color-accent-strong: #c3dc39;
+
+  /* Status colors — used only as small dots, badges and text. */
+  --color-accent-amber: #b45309;
+  --color-accent-blue: #2563eb;
+  --color-accent-violet: #7c3aed;
+  --color-accent-emerald: #059669;
+  --color-accent-rose: #dc2626;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  --animate-fade-up: fade-up 0.3s ease-out both;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-base-950);
+  color: var(--color-base-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(215, 242, 76, 0.55);
+  color: var(--color-base-50);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-base-600);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-base-500);
+}
