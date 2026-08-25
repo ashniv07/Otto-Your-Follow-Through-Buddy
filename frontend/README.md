@@ -4,6 +4,9 @@ React + TypeScript + Vite + Tailwind CSS frontend for Otto, an open-loop trackin
 
 ## Run it
 
+Needs the backend running too — see the repo root [README.md](../README.md) for both commands.
+From this directory alone:
+
 ```bash
 npm install
 npm run dev
@@ -16,11 +19,10 @@ npm run dev
 
 - `src/pages/` — route-level pages (`LandingPage`, `Dashboard`, `LoopsPage`, `PipelinePage`, `ConnectionsPage`)
 - `src/components/` — UI, grouped by feature (`loops/`, `pipeline/`, `connections/`, `landing/`, `layout/`, `ui/`)
-- `src/hooks/useOttoStore.tsx` — the single data-access layer. All reads (`loops`, `pipelineEvents`, `connections`) and writes (`approveLoop`, `declineLoop`, `runCheckNow`, `toggleConnection`) go through this context.
-- `src/lib/mockData.ts` — all hardcoded demo data. This is the only file that needs to change when the backend is wired in — swap its exports (or the bodies of the actions in `useOttoStore.tsx`) for real `fetch` calls against `../backend`.
+- `src/hooks/useOttoStore.tsx` — the single data-access layer. `loops` polls the real backend (`GET /loops` every 15s) and `approveLoop`/`declineLoop`/`runCheckNow` call the real endpoints. `pipelineEvents` and `connections` are still mock data (`src/lib/mockData.ts`) — no backend event log or OAuth-connections model exists yet.
 - `src/types/index.ts` — shared types (`OpenLoop`, `PipelineEvent`, `Connection`).
 
 ## Notes
 
-- No backend is wired up yet — everything is mock data held in React state.
+- Backend base URL defaults to `http://localhost:8080`; override with `VITE_API_URL`.
 - Dark-mode-only is not the theme here; the app uses a light cream/black/lime palette shared between the landing page and the dashboard.

@@ -2,84 +2,37 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import type { Connection, OpenLoop, PipelineEvent } from "../types";
-import {
-  futureAdapters,
-  initialConnections,
-  initialLoops,
-  initialPipelineEvents,
-} from "../lib/mockData";
+import { futureAdapters, initialConnections, initialPipelineEvents } from "../lib/mockData";
 
 /**
  * Single data-access layer for the whole app.
  *
  * Every read (`loops`, `pipelineEvents`, `connections`) and every write
  * (`approveLoop`, `declineLoop`, `runCheckNow`, `toggleConnection`) goes
- * through this context. Today the writes just mutate local state; when the
- * backend exists, each action body is the only thing that needs to change
- * to a `fetch('/api/loops/:id/approve', { method: 'POST' })`-style call —
- * nothing that reads from `useOtto()` elsewhere needs to know.
+ * through this context. `loops` is backed by the real Express API
+ * (backend/api/dashboardRoutes.js); `pipelineEvents` and `connections`
+ * still come from mock data — there's no backend event log or OAuth
+ * connections model built yet.
  */
 
-// Pool of scenarios the "Run check now" button cycles through so repeated
-// clicks in a demo don't show the exact same result twice.
-const CHECK_NOW_TEMPLATES: Array<{
-  loop: Omit<OpenLoop, "id" | "createdAt" | "updatedAt">;
-  eventMessage: string;
-}> = [
-  {
-    loop: {
-      loopType: "order",
-      title: "Standing desk — Order #F7738",
-      expectedState: "Delivered to office address",
-      expectedBy: new Date().toISOString().slice(0, 10),
-      currentState: "Freight carrier scan frozen at “Arrived at facility” for 3 days",
-      status: "stalled",
-      stakes: "low",
-      context: {
-        rawSummary:
-          "Gmail order confirmation from Fully, dated 6 days ago. Freight tracking shows no scan since arriving at the local facility.",
-      },
-    },
-    eventMessage: "New loop created: Standing desk order — freight tracking stalled",
-  },
-  {
-    loop: {
-      loopType: "subscription",
-      title: "Spotify Premium — Family plan",
-      expectedState: "Monthly charge stays at $16.99",
-      expectedBy: new Date().toISOString().slice(0, 10),
-      currentState: "Charged $19.99 this cycle — a $3/mo increase, not yet investigated",
-      status: "stalled",
-      stakes: "money",
-      context: {
-        rawSummary:
-          "Gmail receipt shows $19.99 charged this cycle. The previous 9 receipts all show $16.99 — flagged for investigation.",
-      },
-    },
-    eventMessage: "New loop created: Spotify Family plan — price change flagged",
-  },
-  {
-    loop: {
-      loopType: "calendar",
-      title: "Dentist follow-up booking",
-      expectedState: "Follow-up cleaning appointment booked",
-      expectedBy: new Date().toISOString().slice(0, 10),
-      currentState: "Calendar task overdue, no booking confirmation found in inbox",
-      status: "stalled",
-      stakes: "low",
-      context: {
-        rawSummary:
-          "Calendar task “Book dentist follow-up” passed its due date with no linked confirmation email since.",
-      },
-    },
-    eventMessage: "New loop created: Dentist follow-up booking — task overdue",
-  },
-];
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+
+// The backend's own scheduler already polls adapters on an interval — this
+// just keeps the dashboard's view of Firestore fresh without a manual
+// refresh.
+const POLL_INTERVAL_MS = 15_000;
+
+async function fetchLoops(): Promise<OpenLoop[]> {
+  const res = await fetch(`${API_BASE}/loops`);
+  if (!res.ok) throw new Error(`GET /loops failed: ${res.status}`);
+  return res.json();
+}
 
 interface OttoContextValue {
   loops: OpenLoop[];
@@ -103,7 +56,7 @@ function nextId(prefix: string) {
 }
 
 export function OttoProvider({ children }: { children: ReactNode }) {
-  const [loops, setLoops] = useState<OpenLoop[]>(initialLoops);
+  const [loops, setLoops] = useState<OpenLoop[]>([]);
   const [pipelineEvents, setPipelineEvents] = useState<PipelineEvent[]>(
     initialPipelineEvents,
   );
@@ -113,24 +66,35 @@ export function OttoProvider({ children }: { children: ReactNode }) {
     initialPipelineEvents[initialPipelineEvents.length - 1].timestamp,
   );
   const [isChecking, setIsChecking] = useState(false);
-  const [templateIndex, setTemplateIndex] = useState(0);
+
+  const refreshLoops = useCallback(async () => {
+    try {
+      setLoops(await fetchLoops());
+    } catch (err) {
+      console.error("Failed to load loops from backend:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshLoops();
+    const interval = window.setInterval(refreshLoops, POLL_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [refreshLoops]);
 
   const approveLoop = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const loop = loops.find((l) => l.id === id);
       if (!loop || loop.status !== "needs_approval") return;
-      const now = new Date().toISOString();
-      const summary = loop.context.proposedAction
-        ? `Approved — ${loop.context.proposedAction}`
-        : "Approved by you";
 
-      setLoops((prev) =>
-        prev.map((l) =>
-          l.id === id
-            ? { ...l, status: "resolved", currentState: summary, updatedAt: now, resolvedAt: now }
-            : l,
-        ),
-      );
+      const res = await fetch(`${API_BASE}/loops/${id}/approve`, { method: "POST" });
+      if (!res.ok) {
+        console.error(`POST /loops/${id}/approve failed: ${res.status}`);
+        return;
+      }
+      const updated: OpenLoop = await res.json();
+      setLoops((prev) => prev.map((l) => (l.id === id ? updated : l)));
+
+      const now = new Date().toISOString();
       setPipelineEvents((events) => [
         ...events,
         {
@@ -147,24 +111,19 @@ export function OttoProvider({ children }: { children: ReactNode }) {
   );
 
   const declineLoop = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const loop = loops.find((l) => l.id === id);
       if (!loop || loop.status !== "needs_approval") return;
-      const now = new Date().toISOString();
 
-      setLoops((prev) =>
-        prev.map((l) =>
-          l.id === id
-            ? {
-                ...l,
-                status: "resolved",
-                currentState: "Declined by you — no action taken",
-                updatedAt: now,
-                resolvedAt: now,
-              }
-            : l,
-        ),
-      );
+      const res = await fetch(`${API_BASE}/loops/${id}/decline`, { method: "POST" });
+      if (!res.ok) {
+        console.error(`POST /loops/${id}/decline failed: ${res.status}`);
+        return;
+      }
+      const updated: OpenLoop = await res.json();
+      setLoops((prev) => prev.map((l) => (l.id === id ? updated : l)));
+
+      const now = new Date().toISOString();
       setPipelineEvents((events) => [
         ...events,
         {
@@ -180,40 +139,34 @@ export function OttoProvider({ children }: { children: ReactNode }) {
     [loops],
   );
 
-  const runCheckNow = useCallback(() => {
+  const runCheckNow = useCallback(async () => {
     setIsChecking(true);
-    window.setTimeout(() => {
-      const now = new Date().toISOString();
-      const template =
-        CHECK_NOW_TEMPLATES[templateIndex % CHECK_NOW_TEMPLATES.length];
-      setTemplateIndex((i) => i + 1);
-      const newLoopId = nextId("loop");
-      const runId = `run-manual-${nextId("chk")}`;
+    try {
+      const res = await fetch(`${API_BASE}/run-now`, { method: "POST" });
+      if (!res.ok) throw new Error(`POST /run-now failed: ${res.status}`);
+      const summary: { newLoops: number; rechecked: number; autoResolved: number; needsApproval: number } =
+        await res.json();
 
-      setLoops((prev) => [
-        ...prev,
-        {
-          ...template.loop,
-          id: newLoopId,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ]);
+      await refreshLoops();
+
+      const now = new Date().toISOString();
       setPipelineEvents((prev) => [
         ...prev,
         {
           id: nextId("evt"),
-          runId,
+          runId: `run-manual-${nextId("chk")}`,
           timestamp: now,
           type: "new_loop",
-          message: template.eventMessage,
-          loopId: newLoopId,
+          message: `Manual check: ${summary.newLoops} new, ${summary.rechecked} rechecked, ${summary.autoResolved} auto-resolved, ${summary.needsApproval} need approval`,
         },
       ]);
       setLastCheckedAt(now);
+    } catch (err) {
+      console.error("Run check now failed:", err);
+    } finally {
       setIsChecking(false);
-    }, 1400);
-  }, [templateIndex]);
+    }
+  }, [refreshLoops]);
 
   const toggleConnection = useCallback((id: string) => {
     setConnections((prev) =>

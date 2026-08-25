@@ -18,6 +18,12 @@ export const statusMeta: Record<
   LoopStatus,
   { label: string; dot: string; text: string; border: string }
 > = {
+  pending: {
+    label: "Pending",
+    dot: "bg-base-500",
+    text: "text-base-400",
+    border: "border-base-700/30",
+  },
   stalled: {
     label: "Stalled",
     dot: "bg-accent-amber",
@@ -36,6 +42,12 @@ export const statusMeta: Record<
     text: "text-accent-violet",
     border: "border-accent-violet/30",
   },
+  auto_resolving: {
+    label: "Auto-resolving",
+    dot: "bg-accent-emerald",
+    text: "text-accent-emerald",
+    border: "border-accent-emerald/30",
+  },
   resolved: {
     label: "Resolved",
     dot: "bg-accent-emerald",
@@ -50,9 +62,12 @@ export const stakesMeta: Record<Stakes, { label: string }> = {
   irreversible: { label: "Irreversible" },
 };
 
+// Otto's actual pipeline (no Investigator Agent is built yet, so "stalled"
+// and "investigating" are reserved in the schema but never set today) —
+// board columns reflect the statuses the backend really produces.
 export const statusColumns: { status: LoopStatus; title: string }[] = [
-  { status: "stalled", title: "Stalled" },
-  { status: "investigating", title: "Investigating" },
+  { status: "pending", title: "Pending" },
   { status: "needs_approval", title: "Needs approval" },
+  { status: "auto_resolving", title: "Auto-resolving" },
   { status: "resolved", title: "Resolved" },
 ];

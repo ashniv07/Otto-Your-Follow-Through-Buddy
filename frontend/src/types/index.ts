@@ -1,9 +1,11 @@
 export type LoopType = "order" | "subscription" | "calendar" | "note";
 
 export type LoopStatus =
+  | "pending"
   | "stalled"
   | "investigating"
   | "needs_approval"
+  | "auto_resolving"
   | "resolved";
 
 export type Stakes = "low" | "money" | "irreversible";

@@ -17,7 +17,7 @@ export function LoopCard({ loop, onOpen }: LoopCardProps) {
   const status = statusMeta[loop.status];
   const Icon = type.icon;
   const overdue = daysOverdue(loop.expectedBy);
-  const isInvestigating = loop.status === "investigating";
+  const isInvestigating = loop.status === "investigating" || loop.status === "auto_resolving";
   const isNeedsApproval = loop.status === "needs_approval";
 
   return (
@@ -80,12 +80,18 @@ export function LoopCard({ loop, onOpen }: LoopCardProps) {
           )}
         </div>
 
-        {isNeedsApproval && loop.context.proposedAction && (
+        {isNeedsApproval && (
           <div className="mt-3 rounded-lg border-l-2 border-accent-violet/60 bg-base-800/60 py-2 pl-3 pr-2.5">
-            <p className="text-[11px] font-medium text-accent-violet">Proposed action</p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] text-base-200">
-              {loop.context.proposedAction}
-            </p>
+            {loop.context.proposedAction ? (
+              <>
+                <p className="text-[11px] font-medium text-accent-violet">Proposed action</p>
+                <p className="mt-0.5 line-clamp-2 text-[13px] text-base-200">
+                  {loop.context.proposedAction}
+                </p>
+              </>
+            ) : (
+              <p className="text-[13px] text-base-300">No proposed action drafted — approve to close this loop, or decline.</p>
+            )}
             <ApproveDeclineRow loopId={loop.id} />
           </div>
         )}

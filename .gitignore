@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+otto-backend-key.json
+.env
+test-setup.js
+docs/
