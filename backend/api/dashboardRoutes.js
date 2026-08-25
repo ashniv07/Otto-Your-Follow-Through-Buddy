@@ -1,9 +1,18 @@
 const express = require("express");
+const { getFirestore } = require("firebase-admin/firestore");
 const firestoreClient = require("../core/firestoreClient");
 const { resolveLoop } = require("../core/actionAgent");
 const { runSchedulerJob } = require("../core/schedulerJob");
 
+const db = getFirestore();
 const router = express.Router();
+
+async function isNotionConnected(userId) {
+  const doc = await db.collection("notion_connections").doc(userId).get();
+  if (!doc.exists) return false;
+  const data = doc.data();
+  return Boolean(data.access_token) && !data.disconnected;
+}
 
 function isoOrNull(timestamp) {
   if (!timestamp) return null;
@@ -40,7 +49,17 @@ function serializeLoop(loop) {
 router.get("/loops", async (req, res) => {
   try {
     const loops = await firestoreClient.getAllLoops();
-    res.json(loops.map(serializeLoop));
+    const ownLoops = loops.filter((loop) => loop.user_id === req.userId);
+
+    // A disconnected/never-connected Notion adapter hides its loops rather
+    // than just freezing them — they reappear once reconnected (the loops
+    // themselves aren't touched, this is purely a visibility filter).
+    const notionConnected = await isNotionConnected(req.userId);
+    const visibleLoops = notionConnected
+      ? ownLoops
+      : ownLoops.filter((loop) => loop.source?.adapter !== "notion");
+
+    res.json(visibleLoops.map(serializeLoop));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -51,6 +70,9 @@ router.post("/loops/:id/approve", async (req, res) => {
     const loop = await firestoreClient.getLoopById(req.params.id);
     if (!loop) {
       return res.status(404).json({ error: `No loop found with id "${req.params.id}"` });
+    }
+    if (loop.user_id !== req.userId) {
+      return res.status(403).json({ error: "This loop belongs to another user" });
     }
 
     const updated = await firestoreClient.updateLoop(loop.loop_id, { status: "auto_resolving" });
@@ -66,6 +88,9 @@ router.post("/loops/:id/decline", async (req, res) => {
     const loop = await firestoreClient.getLoopById(req.params.id);
     if (!loop) {
       return res.status(404).json({ error: `No loop found with id "${req.params.id}"` });
+    }
+    if (loop.user_id !== req.userId) {
+      return res.status(403).json({ error: "This loop belongs to another user" });
     }
 
     const resolved = await firestoreClient.updateLoop(loop.loop_id, {

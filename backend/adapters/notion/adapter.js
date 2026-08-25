@@ -1,34 +1,21 @@
 const { Client } = require("@notionhq/client");
 const firestoreClient = require("../../core/firestoreClient");
 const { extractFromNotionItem } = require("./extractionAgent");
+const { getFirestore } = require("firebase-admin/firestore");
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
-const DEFAULT_USER_ID = process.env.DEFAULT_USER_ID || "demo-user";
+const db = getFirestore();
+const CONNECTIONS_COLLECTION = "notion_connections";
 
-// Notion's 2025-09-03 API separates "database" (container) from "data
-// source" (the actual queryable table) — client.databases.query no longer
-// exists, you query a data source instead. Property names also aren't
-// guaranteed (this workspace uses Notion's default "Todo List" template:
-// "Task name" / "Status" / "Due date", not "Title" / "Status" / "Due Date"),
-// so the schema is resolved by property *type* instead of hardcoded names.
-let cachedSchema = null;
+// Multi-tenant now: every function that talks to Notion takes a
+// `connection` (a doc from notion_connections: { user_id, access_token,
+// tracked_page_id, workspace_name, ... }) instead of reading a single
+// global NOTION_TOKEN/NOTION_PAGE_ID from process.env. schedulerJob.js
+// fetches all connections and calls fetchNewItems/recheck once per user.
+const schemaCache = new Map(); // tracked_page_id (data_source_id) -> schema
 
-async function resolveDataSourceId() {
-  if (process.env.NOTION_DATA_SOURCE_ID) return process.env.NOTION_DATA_SOURCE_ID;
+async function resolveSchema(notion, dataSourceId) {
+  if (schemaCache.has(dataSourceId)) return schemaCache.get(dataSourceId);
 
-  const results = await notion.search({ filter: { property: "object", value: "data_source" } });
-  if (results.results.length === 0) {
-    throw new Error(
-      "No Notion data sources are visible to this integration. Share your to-do/Commitments database with it from Notion (••• menu -> Connections)."
-    );
-  }
-  return results.results[0].id;
-}
-
-async function resolveSchema() {
-  if (cachedSchema) return cachedSchema;
-
-  const dataSourceId = await resolveDataSourceId();
   const dataSource = await notion.dataSources.retrieve({ data_source_id: dataSourceId });
   const entries = Object.entries(dataSource.properties);
 
@@ -42,14 +29,15 @@ async function resolveSchema() {
     );
   }
 
-  cachedSchema = {
+  const schema = {
     dataSourceId,
     titleProp,
     dateProp,
     statusProp: statusEntry[0],
     statusType: statusEntry[1].type,
   };
-  return cachedSchema;
+  schemaCache.set(dataSourceId, schema);
+  return schema;
 }
 
 function getTitle(page, titleProp) {
@@ -69,12 +57,25 @@ function isDone(statusName) {
   return (statusName || "").trim().toLowerCase() === "done";
 }
 
-// Queries the to-do database for open items, skips ones we already have a
-// Firestore loop for (dedupe by Notion page id), and returns OpenLoop-ready
-// field objects (source/current_state/context filled in here, loop_type/
-// expected_state/expected_by/stakes from extractionAgent).
-async function fetchNewItems() {
-  const schema = await resolveSchema();
+function toIsoDate(value) {
+  if (!value) return null;
+  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+async function getConnectionForUser(userId) {
+  const doc = await db.collection(CONNECTIONS_COLLECTION).doc(userId).get();
+  return doc.exists ? doc.data() : null;
+}
+
+// Called once per connected user per tick (schedulerJob iterates
+// notion_connections and passes each one in). Returns [] for a connection
+// that hasn't picked a page yet.
+async function fetchNewItems(connection) {
+  if (!connection?.access_token || !connection?.tracked_page_id) return [];
+
+  const notion = new Client({ auth: connection.access_token });
+  const schema = await resolveSchema(notion, connection.tracked_page_id);
 
   const response = await notion.dataSources.query({
     data_source_id: schema.dataSourceId,
@@ -88,7 +89,7 @@ async function fetchNewItems() {
 
   for (const page of response.results) {
     const sourceId = page.id;
-    const existing = await firestoreClient.getLoopBySourceId("notion", sourceId);
+    const existing = await firestoreClient.getLoopBySourceId("notion", sourceId, connection.user_id);
     if (existing) continue;
 
     const rawTitle = getTitle(page, schema.titleProp);
@@ -97,7 +98,7 @@ async function fetchNewItems() {
     const extracted = await extractFromNotionItem({ rawTitle, dueDate, sourceId });
 
     newLoopFields.push({
-      user_id: DEFAULT_USER_ID,
+      user_id: connection.user_id,
       ...extracted,
       source: { adapter: "notion", source_id: sourceId },
       current_state: "task open",
@@ -112,17 +113,15 @@ async function fetchNewItems() {
   return newLoopFields;
 }
 
-function toIsoDate(value) {
-  if (!value) return null;
-  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
-}
+// schedulerJob looks up the right connection for this loop's user_id and
+// passes it in — current_state is returned per the shared adapter contract;
+// title and due-date changes aren't part of that contract, so they're
+// synced straight to Firestore here instead.
+async function recheck(loop, connection) {
+  if (!connection?.access_token) return loop.current_state;
 
-// current_state is returned for schedulerJob to write (per the shared
-// adapter contract); title and due-date changes aren't part of that
-// contract, so they're synced straight to Firestore here instead.
-async function recheck(loop) {
-  const schema = await resolveSchema();
+  const notion = new Client({ auth: connection.access_token });
+  const schema = await resolveSchema(notion, connection.tracked_page_id);
   const page = await notion.pages.retrieve({ page_id: loop.source.source_id });
   const statusName = getStatusName(page, schema.statusProp, schema.statusType);
   const currentTitle = getTitle(page, schema.titleProp);
@@ -146,11 +145,17 @@ async function recheck(loop) {
   return isDone(statusName) ? loop.expected_state : "task open";
 }
 
-// Called by actionAgent.resolveLoop() whenever a loop actually resolves —
-// both a manual dashboard approve and an automatic low-stakes resolution
-// end up here, so either path checks the task off in Notion for real.
+// Called by actionAgent.resolveLoop() whenever a loop actually resolves.
+// Unlike fetchNewItems/recheck, actionAgent only ever passes the loop
+// itself — so the right connection is looked up here by loop.user_id.
 async function execute(loop) {
-  const schema = await resolveSchema();
+  const connection = await getConnectionForUser(loop.user_id);
+  if (!connection?.access_token) {
+    throw new Error(`No Notion connection found for user "${loop.user_id}"`);
+  }
+
+  const notion = new Client({ auth: connection.access_token });
+  const schema = await resolveSchema(notion, connection.tracked_page_id);
   await notion.pages.update({
     page_id: loop.source.source_id,
     properties: {

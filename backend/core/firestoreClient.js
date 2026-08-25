@@ -34,11 +34,15 @@ async function getLoopById(loopId) {
 
 // Used by adapters to dedupe before creating a new loop for the same
 // upstream item (e.g. the same Notion page, Gmail thread, Calendar event).
-async function getLoopBySourceId(adapterName, sourceId) {
+// Scoped per user — two different Otto accounts tracking the same
+// underlying item (e.g. a shared Notion workspace) each get their own loop,
+// rather than the second account's item silently never appearing.
+async function getLoopBySourceId(adapterName, sourceId, userId) {
   const snap = await db
     .collection(COLLECTION)
     .where("source.adapter", "==", adapterName)
     .where("source.source_id", "==", sourceId)
+    .where("user_id", "==", userId)
     .limit(1)
     .get();
   return snap.empty ? null : docToLoop(snap.docs[0]);
