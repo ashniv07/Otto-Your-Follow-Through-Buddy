@@ -11,7 +11,7 @@ const { resolveLoop } = require("./actionAgent");
 // expected_by/stakes/source/context). recheck(loop) returns a string: the
 // loop's up-to-date current_state.
 async function runSchedulerJob() {
-  const summary = { newLoops: 0, rechecked: 0, autoResolved: 0, needsApproval: 0, errors: [] };
+  const summary = { newLoops: 0, rechecked: 0, completed: 0, autoResolved: 0, needsApproval: 0, errors: [] };
 
   for (const [adapterName, adapter] of Object.entries(adapters)) {
     try {
@@ -58,6 +58,15 @@ async function runSchedulerJob() {
   const loopsToEvaluate = await getAllActiveLoops();
   for (const loop of loopsToEvaluate) {
     try {
+      // Genuinely done (e.g. checked off in Notion) — close the loop
+      // immediately regardless of the due date, no policy decision needed
+      // since nothing is being auto-executed on the user's behalf.
+      if (loop.current_state === loop.expected_state) {
+        await updateLoop(loop.loop_id, { status: "resolved", resolved_at: new Date() });
+        summary.completed += 1;
+        continue;
+      }
+
       if (!isStalled(loop)) continue;
 
       const decision = decide(loop);

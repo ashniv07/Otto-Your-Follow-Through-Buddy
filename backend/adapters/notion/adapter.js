@@ -112,20 +112,38 @@ async function fetchNewItems() {
   return newLoopFields;
 }
 
+function toIsoDate(value) {
+  if (!value) return null;
+  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
 // current_state is returned for schedulerJob to write (per the shared
-// adapter contract); title isn't part of that contract, so a change is
-// synced straight to Firestore here rather than only on initial fetch.
+// adapter contract); title and due-date changes aren't part of that
+// contract, so they're synced straight to Firestore here instead.
 async function recheck(loop) {
   const schema = await resolveSchema();
   const page = await notion.pages.retrieve({ page_id: loop.source.source_id });
   const statusName = getStatusName(page, schema.statusProp, schema.statusType);
   const currentTitle = getTitle(page, schema.titleProp);
+  const currentDueDate = getDate(page, schema.dateProp);
 
+  const patch = {};
   if (currentTitle && currentTitle !== loop.context?.raw_title) {
-    await firestoreClient.updateLoop(loop.loop_id, { "context.raw_title": currentTitle });
+    patch["context.raw_title"] = currentTitle;
+  }
+  if (currentDueDate && currentDueDate !== toIsoDate(loop.expected_by)) {
+    patch.expected_by = new Date(currentDueDate);
+  }
+  if (Object.keys(patch).length > 0) {
+    await firestoreClient.updateLoop(loop.loop_id, patch);
   }
 
-  return isDone(statusName) ? "task completed" : "task open";
+  // Match expected_state exactly (not a generic "task completed" string) so
+  // stallDetector's current_state === expected_state check actually
+  // recognizes completion — otherwise a genuinely-done task still gets
+  // flagged stalled the moment its due date passes.
+  return isDone(statusName) ? loop.expected_state : "task open";
 }
 
 // Called by actionAgent.resolveLoop() whenever a loop actually resolves —
