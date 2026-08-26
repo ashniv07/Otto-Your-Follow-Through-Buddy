@@ -1,10 +1,13 @@
-import type { ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarClock, FileText, Search, Sparkles, X } from "lucide-react";
-import type { OpenLoop } from "../../types";
+import { AlertCircle, CalendarClock, Check, FileText, Loader2, Search, Sparkles, X } from "lucide-react";
+import type { ActionSchema, OpenLoop } from "../../types";
 import { loopTypeMeta, stakesMeta, statusMeta } from "./loopMeta";
 import { formatDate, formatDateTime, cn } from "../../lib/utils";
 import { ApproveDeclineRow } from "./ApproveDeclineRow";
+import { useOtto } from "../../hooks/useOttoStore";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 interface LoopDetailModalProps {
   loop: OpenLoop | null;
@@ -46,6 +49,39 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
   const type = loopTypeMeta[loop.loopType];
   const status = statusMeta[loop.status];
   const Icon = type.icon;
+  const schema = loop.context.actionSchema;
+  const { approveLoop, declineLoop } = useOtto();
+
+  const [to, setTo] = useState(schema?.to ?? "");
+  const [cc, setCc] = useState(schema?.cc ?? "");
+  const [subject, setSubject] = useState(schema?.subject ?? "");
+  const [body, setBody] = useState(schema?.body ?? "");
+  const [saving, setSaving] = useState(false);
+
+  // Reset fields when a different loop is opened.
+  useEffect(() => {
+    setTo(schema?.to ?? "");
+    setCc(schema?.cc ?? "");
+    setSubject(schema?.subject ?? "");
+    setBody(schema?.body ?? "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loop.id]);
+
+  async function handleComposeApprove() {
+    setSaving(true);
+    try {
+      await fetch(`${API_BASE}/loops/${loop.id}/action-schema`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, cc, subject, body }),
+      });
+      await approveLoop(loop.id);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div>
@@ -102,7 +138,91 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
           </Section>
         )}
 
-        {loop.context.proposedAction && (
+        {/* Info alert (subscription price change, billing notice, etc.) */}
+        {schema?.type === "info" && (
+          <Section icon={AlertCircle} label="Alert" accent>
+            <p className="text-[14px] font-semibold text-base-50">{schema.headline}</p>
+            {schema.detail && (
+              <p className="mt-1.5 text-[13px] leading-relaxed text-base-200">{schema.detail}</p>
+            )}
+            {loop.status === "needs_approval" && (
+              <div className="mt-3.5 flex gap-2">
+                <button
+                  onClick={() => { approveLoop(loop.id); onClose(); }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-accent-emerald/15 px-3 py-1.5 text-[13px] font-medium text-accent-emerald transition-colors hover:bg-accent-emerald/25"
+                >
+                  <Check size={13} /> Mark as Resolved
+                </button>
+                <button
+                  onClick={() => { declineLoop(loop.id); onClose(); }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-base-800 px-3 py-1.5 text-[13px] font-medium text-base-300 transition-colors hover:bg-base-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* Compose action — editable draft with To / CC / Subject / Body */}
+        {schema?.type === "compose" && (
+          <Section icon={Sparkles} label="Proposed draft" accent>
+            <div className="space-y-2.5">
+              <Field label="To">
+                <input
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  placeholder="recipient@example.com"
+                  className="w-full rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+              <Field label="CC">
+                <input
+                  value={cc}
+                  onChange={(e) => setCc(e.target.value)}
+                  placeholder="optional"
+                  className="w-full rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+              <Field label="Subject">
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+              <Field label="Body">
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={6}
+                  className="w-full resize-y rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] leading-relaxed text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+            </div>
+            {loop.status === "needs_approval" && (
+              <div className="mt-3.5 flex gap-2">
+                <button
+                  onClick={handleComposeApprove}
+                  disabled={saving}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-accent-emerald/15 px-3 py-1.5 text-[13px] font-medium text-accent-emerald transition-colors hover:bg-accent-emerald/25 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  {saving ? "Sending…" : "Send"}
+                </button>
+                <button
+                  onClick={() => { declineLoop(loop.id); onClose(); }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-base-800 px-3 py-1.5 text-[13px] font-medium text-base-300 transition-colors hover:bg-base-700"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* Legacy plain-text proposed action (orders, calendar tasks) */}
+        {!schema && loop.context.proposedAction && (
           <Section icon={Sparkles} label="Proposed action" accent>
             <p className="text-[13px] leading-relaxed text-base-100">
               {loop.context.proposedAction}
@@ -148,6 +268,15 @@ function Section({
         <Icon size={12} />
         {label}
       </div>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-base-500">{label}</p>
       {children}
     </div>
   );

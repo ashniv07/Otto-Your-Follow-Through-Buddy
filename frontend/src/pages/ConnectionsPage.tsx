@@ -3,16 +3,17 @@ import { Plus } from "lucide-react";
 import { useOtto } from "../hooks/useOttoStore";
 import { ConnectionCard } from "../components/connections/ConnectionCard";
 import { NotionConnectionCard } from "../components/connections/NotionConnectionCard";
+import { GoogleConnectionCard } from "../components/connections/GoogleConnectionCard";
 import { AddConnectionModal } from "../components/connections/AddConnectionModal";
 
 export function ConnectionsPage() {
   const { connections, futureAdapters, toggleConnection } = useOtto();
   const [addOpen, setAddOpen] = useState(false);
 
-  // "conn-notes" used to be mock data standing in for Notion — it's now the
-  // real OAuth-backed NotionConnectionCard instead, everything else here is
-  // still mock (Gmail/Calendar have no real connection flow yet).
-  const mockConnections = connections.filter((c) => c.id !== "conn-notes");
+  // Exclude Notion (real card) and google adapters (real card) from mock list
+  const mockConnections = connections.filter(
+    (c) => c.id !== "conn-notes" && c.id !== "conn-gmail" && c.id !== "conn-calendar",
+  );
 
   return (
     <div>
@@ -27,13 +28,7 @@ export function ConnectionsPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <NotionConnectionCard />
-        {mockConnections.map((connection) => (
-          <ConnectionCard
-            key={connection.id}
-            connection={connection}
-            onToggle={toggleConnection}
-          />
-        ))}
+        <GoogleConnectionCard />
 
         <button
           onClick={() => setAddOpen(true)}

@@ -7,6 +7,17 @@ const { runSchedulerJob } = require("../core/schedulerJob");
 const db = getFirestore();
 const router = express.Router();
 
+async function getConnectionsForUser(userId) {
+  const [notionSnap, googleSnap] = await Promise.all([
+    db.collection("notion_connections").where("user_id", "==", userId).limit(1).get(),
+    db.collection("google_connections").where("user_id", "==", userId).limit(1).get(),
+  ]);
+  return {
+    notion: notionSnap.docs.map(d => d.data()).filter(c => c.access_token),
+    google: googleSnap.docs.map(d => d.data()).filter(c => c.access_token && c.connected),
+  };
+}
+
 async function isNotionConnected(userId) {
   const doc = await db.collection("notion_connections").doc(userId).get();
   if (!doc.exists) return false;
@@ -39,6 +50,7 @@ function serializeLoop(loop) {
       rawSummary: loop.context?.raw_summary || "",
       investigationNotes: loop.context?.investigation_notes || undefined,
       proposedAction: loop.context?.proposed_action || undefined,
+      actionSchema: loop.context?.action_schema || undefined,
     },
     createdAt: isoOrNull(loop.created_at),
     updatedAt: isoOrNull(loop.updated_at),
@@ -76,7 +88,9 @@ router.post("/loops/:id/approve", async (req, res) => {
     }
 
     const updated = await firestoreClient.updateLoop(loop.loop_id, { status: "auto_resolving" });
-    const resolved = await resolveLoop(updated);
+    const connections = await getConnectionsForUser(req.userId);
+    const resolved = await resolveLoop(updated, connections);
+    await firestoreClient.createPipelineEvent({ user_id: req.userId, type: "user_approved", loop_id: loop.loop_id, run_id: "run-manual-approval", message: `You approved: ${loop.context?.raw_title || loop.expected_state}` });
     res.json(serializeLoop(resolved));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -98,7 +112,50 @@ router.post("/loops/:id/decline", async (req, res) => {
       current_state: "Declined by user — no action taken",
       resolved_at: new Date(),
     });
+    await firestoreClient.createPipelineEvent({ user_id: req.userId, type: "user_declined", loop_id: loop.loop_id, run_id: "run-manual-approval", message: `You declined: ${loop.context?.raw_title || loop.expected_state} — no action taken` });
     res.json(serializeLoop(resolved));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Lets the approval modal save edits to compose fields before the user clicks Approve.
+router.patch("/loops/:id/action-schema", async (req, res) => {
+  try {
+    const loop = await firestoreClient.getLoopById(req.params.id);
+    if (!loop || loop.user_id !== req.userId) return res.status(404).json({ error: "Not found" });
+    const { to, cc, subject, body } = req.body;
+    const updated = await firestoreClient.updateLoop(loop.loop_id, {
+      "context.action_schema": { ...loop.context?.action_schema, to, cc, subject, body },
+    });
+    res.json(serializeLoop(updated));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/pipeline-events", async (req, res) => {
+  try {
+    const snap = await db
+      .collection("pipeline_events")
+      .where("user_id", "==", req.userId)
+      .orderBy("timestamp", "desc")
+      .limit(200)
+      .get();
+    const events = snap.docs.map((doc) => {
+      const d = doc.data();
+      const ts = d.timestamp;
+      const iso = ts?.toDate ? ts.toDate().toISOString() : ts ? new Date(ts).toISOString() : new Date().toISOString();
+      return {
+        id: doc.id,
+        timestamp: iso,
+        type: d.type,
+        message: d.message,
+        loopId: d.loop_id ?? undefined,
+        runId: d.run_id ?? undefined,
+      };
+    });
+    res.json(events);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

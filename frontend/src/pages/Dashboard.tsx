@@ -11,19 +11,24 @@ import { ConnectionsPage } from "./ConnectionsPage";
 export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const cameFromNotionOAuth = searchParams.get("connected") === "notion";
-  const [activeTab, setActiveTab] = useState<TabKey>(cameFromNotionOAuth ? "connections" : "loops");
+  const cameFromGoogleOAuth = searchParams.get("connected") === "google";
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    cameFromNotionOAuth || cameFromGoogleOAuth ? "connections" : "loops",
+  );
   const [openLoopId, setOpenLoopId] = useState<string | null>(null);
-  const { refreshNotionStatus } = useOtto();
+  const { refreshNotionStatus, refreshGoogleStatus } = useOtto();
 
-  // Lands here after the Notion OAuth redirect (backend/api/authRoutes.js's
-  // /callback) — jump to Connections and pull the freshly-created
-  // connection, then drop the query params so this doesn't refire on a
-  // later manual visit.
   useEffect(() => {
     if (!cameFromNotionOAuth) return;
     refreshNotionStatus();
     setSearchParams({}, { replace: true });
   }, [cameFromNotionOAuth, refreshNotionStatus, setSearchParams]);
+
+  useEffect(() => {
+    if (!cameFromGoogleOAuth) return;
+    refreshGoogleStatus();
+    setSearchParams({}, { replace: true });
+  }, [cameFromGoogleOAuth, refreshGoogleStatus, setSearchParams]);
 
   function viewLoopFromPipeline(loopId: string) {
     setActiveTab("loops");

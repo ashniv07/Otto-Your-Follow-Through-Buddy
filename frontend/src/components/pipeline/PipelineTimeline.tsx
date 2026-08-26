@@ -37,6 +37,11 @@ export function PipelineTimeline({ runs, onViewLoop }: PipelineTimelineProps) {
 
   return (
     <div className="space-y-3">
+      {dateGroups.length === 0 && (
+        <div className="rounded-xl border border-base-800 bg-base-900/70 px-4 py-10 text-center text-[13px] text-base-500">
+          No activity yet — click <span className="text-base-300">Run check now</span> to start tracking.
+        </div>
+      )}
       {dateGroups.map((group, groupIdx) => (
         <div
           key={group.dateKey}

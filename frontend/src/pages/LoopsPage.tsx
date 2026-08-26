@@ -5,7 +5,7 @@ import { LoopColumn } from "../components/loops/LoopColumn";
 import { LoopDetailModal } from "../components/loops/LoopDetailModal";
 import { LoopFilterBar } from "../components/loops/LoopFilterBar";
 import { ResolvedDrawer } from "../components/loops/ResolvedDrawer";
-import { statusColumns } from "../components/loops/loopMeta";
+import { statusColumns, APPROVAL_STATUSES } from "../components/loops/loopMeta";
 import type { LoopType } from "../types";
 
 interface LoopsPageProps {
@@ -13,7 +13,7 @@ interface LoopsPageProps {
   onOpenChange: (id: string | null) => void;
 }
 
-const BOARD_COLUMNS = statusColumns.filter((c) => c.status !== "resolved");
+const BOARD_COLUMNS = statusColumns.filter((c) => !c.statuses.includes("resolved"));
 
 export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
   const { loops } = useOtto();
@@ -34,9 +34,19 @@ export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
   );
 
   const grouped = useMemo(() => {
-    const map = new Map(BOARD_COLUMNS.map((c) => [c.status, [] as typeof loops]));
+    const map = new Map(BOARD_COLUMNS.map((c) => [c.id, [] as typeof loops]));
     for (const loop of filteredLoops) {
-      map.get(loop.status)?.push(loop);
+      if (APPROVAL_STATUSES.includes(loop.status as (typeof APPROVAL_STATUSES)[number])) {
+        // compose schema OR a proposed action Otto drafted (order investigations) → Stalled
+        const isCompose =
+          loop.context?.actionSchema?.type === "compose" ||
+          (!loop.context?.actionSchema && !!loop.context?.proposedAction);
+        const dest = isCompose ? "approve_action" : "mark_as_done";
+        map.get(dest)?.push(loop);
+      } else {
+        const col = BOARD_COLUMNS.find((c) => c.statuses.includes(loop.status));
+        if (col) map.get(col.id)?.push(loop);
+      }
     }
     return map;
   }, [filteredLoops]);
@@ -79,10 +89,10 @@ export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {BOARD_COLUMNS.map((col) => (
           <LoopColumn
-            key={col.status}
-            status={col.status}
+            key={col.id}
+            dot={col.dot}
             title={col.title}
-            loops={grouped.get(col.status) ?? []}
+            loops={grouped.get(col.id) ?? []}
             onOpen={onOpenChange}
           />
         ))}

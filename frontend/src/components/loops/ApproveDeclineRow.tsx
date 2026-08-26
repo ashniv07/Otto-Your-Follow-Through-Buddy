@@ -6,12 +6,13 @@ import { cn } from "../../lib/utils";
 
 interface ApproveDeclineRowProps {
   loopId: string;
+  approveLabel?: string;
   className?: string;
 }
 
 type Phase = "idle" | "approving" | "declining";
 
-export function ApproveDeclineRow({ loopId, className }: ApproveDeclineRowProps) {
+export function ApproveDeclineRow({ loopId, approveLabel = "Approve", className }: ApproveDeclineRowProps) {
   const { approveLoop, declineLoop } = useOtto();
   const [phase, setPhase] = useState<Phase>("idle");
 
@@ -61,7 +62,7 @@ export function ApproveDeclineRow({ loopId, className }: ApproveDeclineRowProps)
               className="flex items-center gap-1.5"
             >
               <Check size={14} strokeWidth={3} />
-              Approved
+              Done
             </motion.span>
           ) : (
             <motion.span
@@ -71,7 +72,7 @@ export function ApproveDeclineRow({ loopId, className }: ApproveDeclineRowProps)
               exit={{ opacity: 0 }}
               className="flex items-center gap-1.5"
             >
-              Approve
+              {approveLabel}
             </motion.span>
           )}
         </AnimatePresence>

@@ -1,9 +1,6 @@
-// Pure logic, no LLM call: routes a stalled loop based on how risky it is
-// to act on automatically.
+// Pure logic: all stalled loops surface to the user for approval — Otto never acts autonomously.
 function decide(loop) {
-  if (loop.stakes === "low") return "auto_resolving";
-  if (loop.stakes === "money" || loop.stakes === "irreversible") return "needs_approval";
-  throw new Error(`Unknown stakes value: "${loop.stakes}"`);
+  return "needs_approval";
 }
 
 module.exports = { decide };

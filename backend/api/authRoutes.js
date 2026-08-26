@@ -152,4 +152,59 @@ router.post("/notion/select-page", async (req, res) => {
   }
 });
 
+// ── Google OAuth (Gmail + Calendar + Tasks) ──────────────────────────────────
+const googleAuth = require("../adapters/google/auth");
+
+router.get("/google/connect", (req, res) => {
+  const url = googleAuth.getAuthUrl();
+  res.redirect(url);
+});
+
+router.get("/google/callback", async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.redirect(`${FRONTEND_URL}/app?connected=google&error=access_denied`);
+  }
+  try {
+    const tokens = await googleAuth.exchangeCode(code);
+
+    // Email is display-only — if userinfo fails, still save the connection.
+    let userEmail = null;
+    try {
+      const { google } = require("googleapis");
+      const client = googleAuth.createOAuth2Client();
+      client.setCredentials(tokens);
+      const oauth2 = google.oauth2({ version: "v2", auth: client });
+      const info = await oauth2.userinfo.get();
+      userEmail = info.data.email;
+    } catch (emailErr) {
+      console.warn("[google] userinfo fetch failed (non-fatal):", emailErr.message);
+    }
+
+    await googleAuth.saveConnection(req.userId, tokens, userEmail);
+    res.redirect(`${FRONTEND_URL}/app?connected=google`);
+  } catch (err) {
+    console.error("Google OAuth callback failed:", err.message);
+    res.redirect(`${FRONTEND_URL}/app?connected=google&error=oauth_failed`);
+  }
+});
+
+router.get("/google/status", async (req, res) => {
+  try {
+    const status = await googleAuth.getConnectionStatus(req.userId);
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/google/disconnect", async (req, res) => {
+  try {
+    await googleAuth.disconnectUser(req.userId);
+    res.json({ disconnected: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

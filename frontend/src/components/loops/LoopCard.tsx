@@ -92,7 +92,14 @@ export function LoopCard({ loop, onOpen }: LoopCardProps) {
             ) : (
               <p className="text-[13px] text-base-300">No proposed action drafted — approve to close this loop, or decline.</p>
             )}
-            <ApproveDeclineRow loopId={loop.id} />
+            <ApproveDeclineRow
+              loopId={loop.id}
+              approveLabel={
+                loop.context.actionSchema?.type === "compose" || (!loop.context.actionSchema && !!loop.context.proposedAction)
+                  ? "Send"
+                  : "Mark as Resolved"
+              }
+            />
           </div>
         )}
 

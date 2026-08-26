@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Connection, OpenLoop, PipelineEvent } from "../types";
-import { futureAdapters, initialConnections, initialPipelineEvents } from "../lib/mockData";
+import { futureAdapters, initialConnections } from "../lib/mockData";
 
 /**
  * Single data-access layer for the whole app.
@@ -32,6 +32,12 @@ const POLL_INTERVAL_MS = 15_000;
 // session lives in an httpOnly cookie (see backend/server.js), and a
 // cross-origin fetch (5173 -> 8080) neither sends nor stores cookies
 // without it.
+async function fetchPipelineEvents(): Promise<PipelineEvent[]> {
+  const res = await fetch(`${API_BASE}/pipeline-events`, { credentials: "include" });
+  if (!res.ok) throw new Error(`GET /pipeline-events failed: ${res.status}`);
+  return res.json();
+}
+
 async function fetchLoops(): Promise<OpenLoop[]> {
   const res = await fetch(`${API_BASE}/loops`, { credentials: "include" });
   if (!res.ok) throw new Error(`GET /loops failed: ${res.status}`);
@@ -47,6 +53,17 @@ export interface NotionConnectionState {
   connected: boolean;
   workspaceName?: string;
   trackedPageId?: string | null;
+}
+
+export interface GoogleConnectionState {
+  connected: boolean;
+  email?: string | null;
+}
+
+async function fetchGoogleStatus(): Promise<GoogleConnectionState> {
+  const res = await fetch(`${API_BASE}/api/auth/google/status`, { credentials: "include" });
+  if (!res.ok) throw new Error(`GET /api/auth/google/status failed: ${res.status}`);
+  return res.json();
 }
 
 async function fetchNotionStatus(): Promise<NotionConnectionState> {
@@ -74,30 +91,25 @@ interface OttoContextValue {
   loadNotionPages: () => void;
   selectNotionPage: (pageId: string) => void;
   disconnectNotion: () => void;
+  googleConnection: GoogleConnectionState | null;
+  connectGoogle: () => void;
+  disconnectGoogle: () => void;
+  refreshGoogleStatus: () => void;
 }
 
 const OttoContext = createContext<OttoContextValue | null>(null);
 
-let uidCounter = 0;
-function nextId(prefix: string) {
-  uidCounter += 1;
-  return `${prefix}-${Date.now()}-${uidCounter}`;
-}
-
 export function OttoProvider({ children }: { children: ReactNode }) {
   const [loops, setLoops] = useState<OpenLoop[]>([]);
-  const [pipelineEvents, setPipelineEvents] = useState<PipelineEvent[]>(
-    initialPipelineEvents,
-  );
+  const [pipelineEvents, setPipelineEvents] = useState<PipelineEvent[]>([]);
   const [connections, setConnections] =
     useState<Connection[]>(initialConnections);
-  const [lastCheckedAt, setLastCheckedAt] = useState<string>(
-    initialPipelineEvents[initialPipelineEvents.length - 1].timestamp,
-  );
+  const [lastCheckedAt, setLastCheckedAt] = useState<string>("");
   const [isChecking, setIsChecking] = useState(false);
   const [notionConnection, setNotionConnection] = useState<NotionConnectionState | null>(null);
   const [notionPages, setNotionPages] = useState<NotionPage[] | null>(null);
   const [notionPagesLoading, setNotionPagesLoading] = useState(false);
+  const [googleConnection, setGoogleConnection] = useState<GoogleConnectionState | null>(null);
 
   const refreshLoops = useCallback(async () => {
     try {
@@ -107,11 +119,25 @@ export function OttoProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshPipelineEvents = useCallback(async () => {
+    try {
+      const events = await fetchPipelineEvents();
+      setPipelineEvents(events);
+      if (events.length > 0) setLastCheckedAt(events[0].timestamp);
+    } catch (err) {
+      console.error("Failed to load pipeline events:", err);
+    }
+  }, []);
+
   useEffect(() => {
     refreshLoops();
-    const interval = window.setInterval(refreshLoops, POLL_INTERVAL_MS);
+    refreshPipelineEvents();
+    const interval = window.setInterval(() => {
+      refreshLoops();
+      refreshPipelineEvents();
+    }, POLL_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [refreshLoops]);
+  }, [refreshLoops, refreshPipelineEvents]);
 
   const refreshNotionStatus = useCallback(async () => {
     try {
@@ -161,6 +187,35 @@ export function OttoProvider({ children }: { children: ReactNode }) {
     [refreshNotionStatus],
   );
 
+  const refreshGoogleStatus = useCallback(async () => {
+    try {
+      setGoogleConnection(await fetchGoogleStatus());
+    } catch (err) {
+      console.error("Failed to load Google connection status:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshGoogleStatus();
+  }, [refreshGoogleStatus]);
+
+  const connectGoogle = useCallback(() => {
+    window.location.href = `${API_BASE}/api/auth/google/connect`;
+  }, []);
+
+  const disconnectGoogle = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/google/disconnect`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`DELETE /api/auth/google/disconnect failed: ${res.status}`);
+      await refreshGoogleStatus();
+    } catch (err) {
+      console.error("Failed to disconnect Google:", err);
+    }
+  }, [refreshGoogleStatus]);
+
   const disconnectNotion = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/auth/notion/disconnect`, {
@@ -190,21 +245,9 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       }
       const updated: OpenLoop = await res.json();
       setLoops((prev) => prev.map((l) => (l.id === id ? updated : l)));
-
-      const now = new Date().toISOString();
-      setPipelineEvents((events) => [
-        ...events,
-        {
-          id: nextId("evt"),
-          runId: "run-manual-approval",
-          timestamp: now,
-          type: "user_approved",
-          message: `You approved: ${loop.title} — ${loop.context.proposedAction ?? "action taken"}`,
-          loopId: id,
-        },
-      ]);
+      await refreshPipelineEvents();
     },
-    [loops],
+    [loops, refreshPipelineEvents],
   );
 
   const declineLoop = useCallback(
@@ -222,21 +265,9 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       }
       const updated: OpenLoop = await res.json();
       setLoops((prev) => prev.map((l) => (l.id === id ? updated : l)));
-
-      const now = new Date().toISOString();
-      setPipelineEvents((events) => [
-        ...events,
-        {
-          id: nextId("evt"),
-          runId: "run-manual-approval",
-          timestamp: now,
-          type: "user_declined",
-          message: `You declined: ${loop.title} — no action taken`,
-          loopId: id,
-        },
-      ]);
+      await refreshPipelineEvents();
     },
-    [loops],
+    [loops, refreshPipelineEvents],
   );
 
   const runCheckNow = useCallback(async () => {
@@ -244,29 +275,14 @@ export function OttoProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch(`${API_BASE}/run-now`, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error(`POST /run-now failed: ${res.status}`);
-      const summary: { newLoops: number; rechecked: number; autoResolved: number; needsApproval: number } =
-        await res.json();
-
       await refreshLoops();
-
-      const now = new Date().toISOString();
-      setPipelineEvents((prev) => [
-        ...prev,
-        {
-          id: nextId("evt"),
-          runId: `run-manual-${nextId("chk")}`,
-          timestamp: now,
-          type: "new_loop",
-          message: `Manual check: ${summary.newLoops} new, ${summary.rechecked} rechecked, ${summary.autoResolved} auto-resolved, ${summary.needsApproval} need approval`,
-        },
-      ]);
-      setLastCheckedAt(now);
+      await refreshPipelineEvents();
     } catch (err) {
       console.error("Run check now failed:", err);
     } finally {
       setIsChecking(false);
     }
-  }, [refreshLoops]);
+  }, [refreshLoops, refreshPipelineEvents]);
 
   const toggleConnection = useCallback((id: string) => {
     setConnections((prev) =>
@@ -301,6 +317,10 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       loadNotionPages,
       selectNotionPage,
       disconnectNotion,
+      googleConnection,
+      connectGoogle,
+      disconnectGoogle,
+      refreshGoogleStatus,
     }),
     [
       loops,
@@ -320,6 +340,10 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       loadNotionPages,
       selectNotionPage,
       disconnectNotion,
+      googleConnection,
+      connectGoogle,
+      disconnectGoogle,
+      refreshGoogleStatus,
     ],
   );
 
