@@ -1,17 +1,23 @@
 const { updateLoop } = require("./firestoreClient");
 const adapters = require("./adapterRegistry");
 
-// For "auto_resolving" loops: runs the owning adapter's execute() if it has
-// one (e.g. Calendar's sendWish), then marks the loop resolved in Firestore.
-// For "needs_approval" loops: does nothing — left for the approve endpoint.
-async function resolveLoop(loop) {
+// connections: { google: [...], notion: [...] } — passed through so
+// adapters like calendar can call their Google API during execute().
+async function resolveLoop(loop, connections = {}) {
   if (loop.status !== "auto_resolving") {
     return loop;
   }
 
   const adapter = adapters[loop.source?.adapter];
   if (adapter && typeof adapter.execute === "function") {
-    await adapter.execute(loop);
+    const adapterName = loop.source?.adapter;
+    let connection;
+    if (adapterName === "notion") {
+      connection = (connections.notion || []).find(c => c.user_id === loop.user_id);
+    } else if (adapterName === "gmail" || adapterName === "calendar") {
+      connection = (connections.google || []).find(c => c.user_id === loop.user_id);
+    }
+    await adapter.execute(loop, connection);
   }
 
   return updateLoop(loop.loop_id, {

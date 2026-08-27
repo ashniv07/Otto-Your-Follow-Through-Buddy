@@ -3,6 +3,8 @@ import {
   CreditCard,
   CalendarClock,
   StickyNote,
+  Briefcase,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import type { LoopStatus, LoopType, Stakes } from "../../types";
@@ -12,6 +14,8 @@ export const loopTypeMeta: Record<LoopType, { label: string; icon: LucideIcon }>
   subscription: { label: "Subscription", icon: CreditCard },
   calendar: { label: "Calendar", icon: CalendarClock },
   note: { label: "Note", icon: StickyNote },
+  opportunity: { label: "Opportunity", icon: Briefcase },
+  follow_up: { label: "Follow-up", icon: MessageSquare },
 };
 
 export const statusMeta: Record<
@@ -62,12 +66,12 @@ export const stakesMeta: Record<Stakes, { label: string }> = {
   irreversible: { label: "Irreversible" },
 };
 
-// Otto's actual pipeline (no Investigator Agent is built yet, so "stalled"
-// and "investigating" are reserved in the schema but never set today) —
-// board columns reflect the statuses the backend really produces.
-export const statusColumns: { status: LoopStatus; title: string }[] = [
-  { status: "pending", title: "Pending" },
-  { status: "needs_approval", title: "Needs approval" },
-  { status: "auto_resolving", title: "Auto-resolving" },
-  { status: "resolved", title: "Resolved" },
+// Approval-track statuses — split into two columns by actionSchema.type in LoopsPage.
+export const APPROVAL_STATUSES: LoopStatus[] = ["stalled", "investigating", "needs_approval", "auto_resolving"];
+
+export const statusColumns: { id: string; title: string; statuses: LoopStatus[]; dot: string }[] = [
+  { id: "watching",       title: "Waiting",          statuses: ["pending"],        dot: "bg-base-500" },
+  { id: "approve_action", title: "Stalled",          statuses: APPROVAL_STATUSES,  dot: "bg-accent-violet" },
+  { id: "mark_as_done",   title: "Acknowledge",      statuses: APPROVAL_STATUSES,  dot: "bg-accent-amber" },
+  { id: "resolved",       title: "Resolved",         statuses: ["resolved"],       dot: "bg-accent-emerald" },
 ];

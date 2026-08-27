@@ -1,4 +1,4 @@
-export type LoopType = "order" | "subscription" | "calendar" | "note";
+export type LoopType = "order" | "subscription" | "calendar" | "note" | "opportunity" | "follow_up";
 
 export type LoopStatus =
   | "pending"
@@ -9,6 +9,16 @@ export type LoopStatus =
   | "resolved";
 
 export type Stakes = "low" | "money" | "irreversible";
+
+export interface ActionSchema {
+  type: "compose" | "info";
+  to?: string;
+  cc?: string;
+  subject?: string;
+  body?: string;
+  headline?: string;
+  detail?: string;
+}
 
 export interface OpenLoop {
   id: string;
@@ -23,6 +33,7 @@ export interface OpenLoop {
     rawSummary: string;
     investigationNotes?: string;
     proposedAction?: string;
+    actionSchema?: ActionSchema;
   };
   createdAt: string;
   updatedAt: string;

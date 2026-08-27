@@ -46,7 +46,7 @@ export function PipelinePage({ onViewLoop }: PipelinePageProps) {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-emerald opacity-60" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-emerald" />
             </span>
-            Last checked {timeAgo(lastCheckedAt)}
+            Last checked {lastCheckedAt ? timeAgo(lastCheckedAt) : "never"}
           </div>
         </div>
 

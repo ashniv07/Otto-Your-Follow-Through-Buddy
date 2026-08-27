@@ -63,6 +63,13 @@ async function getAllActiveLoops() {
   return loops.filter((loop) => loop.status !== "resolved");
 }
 
+async function createPipelineEvent(event) {
+  await db.collection("pipeline_events").add({
+    ...event,
+    timestamp: FieldValue.serverTimestamp(),
+  });
+}
+
 module.exports = {
   COLLECTION,
   createLoop,
@@ -72,4 +79,5 @@ module.exports = {
   getLoopsByStatus,
   getAllLoops,
   getAllActiveLoops,
+  createPipelineEvent,
 };

@@ -1,22 +1,23 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronLeft } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Unplug } from "lucide-react";
 import { useOtto } from "../hooks/useOttoStore";
 import { LoopColumn } from "../components/loops/LoopColumn";
 import { LoopDetailModal } from "../components/loops/LoopDetailModal";
 import { LoopFilterBar } from "../components/loops/LoopFilterBar";
 import { ResolvedDrawer } from "../components/loops/ResolvedDrawer";
-import { statusColumns } from "../components/loops/loopMeta";
+import { statusColumns, APPROVAL_STATUSES } from "../components/loops/loopMeta";
 import type { LoopType } from "../types";
 
 interface LoopsPageProps {
   openId: string | null;
   onOpenChange: (id: string | null) => void;
+  onNavigateToConnections?: () => void;
 }
 
-const BOARD_COLUMNS = statusColumns.filter((c) => c.status !== "resolved");
+const BOARD_COLUMNS = statusColumns.filter((c) => !c.statuses.includes("resolved"));
 
-export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
-  const { loops } = useOtto();
+export function LoopsPage({ openId, onOpenChange, onNavigateToConnections }: LoopsPageProps) {
+  const { loops, googleConnection, notionConnection } = useOtto();
   const [typeFilter, setTypeFilter] = useState<LoopType | null>(null);
   const [resolvedOpen, setResolvedOpen] = useState(false);
 
@@ -34,9 +35,19 @@ export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
   );
 
   const grouped = useMemo(() => {
-    const map = new Map(BOARD_COLUMNS.map((c) => [c.status, [] as typeof loops]));
+    const map = new Map(BOARD_COLUMNS.map((c) => [c.id, [] as typeof loops]));
     for (const loop of filteredLoops) {
-      map.get(loop.status)?.push(loop);
+      if (APPROVAL_STATUSES.includes(loop.status as (typeof APPROVAL_STATUSES)[number])) {
+        // compose schema OR a proposed action Otto drafted (order investigations) → Stalled
+        const isCompose =
+          loop.context?.actionSchema?.type === "compose" ||
+          (!loop.context?.actionSchema && !!loop.context?.proposedAction);
+        const dest = isCompose ? "approve_action" : "mark_as_done";
+        map.get(dest)?.push(loop);
+      } else {
+        const col = BOARD_COLUMNS.find((c) => c.statuses.includes(loop.status));
+        if (col) map.get(col.id)?.push(loop);
+      }
     }
     return map;
   }, [filteredLoops]);
@@ -47,6 +58,34 @@ export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
   );
 
   const openLoop = loops.find((l) => l.id === openId) ?? null;
+
+  // Both connections have loaded and neither is active → show empty state.
+  const nothingConnected =
+    googleConnection !== null && !googleConnection.connected &&
+    notionConnection !== null && !notionConnection.connected;
+
+  if (nothingConnected) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-base-800">
+          <Unplug size={24} className="text-base-400" />
+        </div>
+        <h2 className="mb-1 text-base font-semibold text-base-100">No connections yet</h2>
+        <p className="mb-6 max-w-xs text-[13px] text-base-400">
+          Connect Gmail or Notion so Otto can start watching your loops.
+        </p>
+        {onNavigateToConnections && (
+          <button
+            type="button"
+            onClick={onNavigateToConnections}
+            className="rounded-lg bg-accent-lime px-4 py-2 text-sm font-semibold text-base-950 transition-opacity hover:opacity-90"
+          >
+            Go to Connections
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -79,10 +118,10 @@ export function LoopsPage({ openId, onOpenChange }: LoopsPageProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {BOARD_COLUMNS.map((col) => (
           <LoopColumn
-            key={col.status}
-            status={col.status}
+            key={col.id}
+            dot={col.dot}
             title={col.title}
-            loops={grouped.get(col.status) ?? []}
+            loops={grouped.get(col.id) ?? []}
             onOpen={onOpenChange}
           />
         ))}

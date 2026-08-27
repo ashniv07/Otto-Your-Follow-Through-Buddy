@@ -1,7 +1,7 @@
 const { Timestamp } = require("firebase-admin/firestore");
 const { randomUUID } = require("crypto");
 
-const LOOP_TYPES = ["note", "subscription", "calendar"];
+const LOOP_TYPES = ["note", "subscription", "calendar", "order", "opportunity", "follow_up"];
 const STATUSES = [
   "pending",
   "stalled",
@@ -49,6 +49,7 @@ function createOpenLoop(fields = {}) {
       raw_summary: fields.context?.raw_summary || "",
       investigation_notes: fields.context?.investigation_notes || "",
       proposed_action: fields.context?.proposed_action || "",
+      ...(fields.context?.action_schema ? { action_schema: fields.context.action_schema } : {}),
     },
     stakes: fields.stakes,
     created_at: fields.created_at ? toTimestamp(fields.created_at) : now,
