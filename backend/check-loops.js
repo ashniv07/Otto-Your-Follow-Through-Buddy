@@ -6,17 +6,25 @@ if (!getApps().length) {
   initializeApp({ credential: applicationDefault(), projectId: process.env.GOOGLE_CLOUD_PROJECT });
 }
 
+// Delete noisy loops that slipped past the inbox filter.
+const NOISE_KEYWORDS = [
+  "notion", "kaggle", "claude", "slack confirmation", "shared with you",
+  "confirmation code", "verification code", "otp",
+];
+
 const db = getFirestore();
-db.collection("open_loops").get().then(snap => {
-  console.log("Total loops:", snap.size);
-  snap.docs.forEach(d => {
-    const l = d.data();
-    const schema = l.context?.action_schema?.type || "none";
-    const uid = l.user_id?.slice(0, 8);
-    const eb = l.expected_by?.toDate?.()?.toISOString?.()?.slice(0,10) || l.expected_by;
-    if (["opportunity","follow_up","subscription"].includes(l.loop_type)) {
-      console.log(`${l.loop_type} | ${l.status} | schema=${schema} | uid=${uid} | eb=${eb} | ${l.context?.raw_title?.slice(0,35)}`);
-    }
+db.collection("open_loops").get().then(async snap => {
+  const toDelete = snap.docs.filter(d => {
+    const title = (d.data().context?.raw_title || "").toLowerCase();
+    return NOISE_KEYWORDS.some(kw => title.includes(kw));
   });
+  console.log(`Deleting ${toDelete.length} noisy loops...`);
+  for (const doc of toDelete) {
+    const l = doc.data();
+    console.log(`  del | ${l.context?.raw_title?.slice(0, 60)}`);
+    await doc.ref.delete();
+  }
+  console.log("Done.");
   process.exit(0);
 }).catch(e => { console.error(e.message); process.exit(1); });
+

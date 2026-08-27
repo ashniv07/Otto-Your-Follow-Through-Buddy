@@ -50,7 +50,11 @@ export function Dashboard() {
             transition={{ duration: 0.15 }}
           >
             {activeTab === "loops" && (
-              <LoopsPage openId={openLoopId} onOpenChange={setOpenLoopId} />
+              <LoopsPage
+                openId={openLoopId}
+                onOpenChange={setOpenLoopId}
+                onNavigateToConnections={() => setActiveTab("connections")}
+              />
             )}
             {activeTab === "pipeline" && (
               <PipelinePage onViewLoop={viewLoopFromPipeline} />

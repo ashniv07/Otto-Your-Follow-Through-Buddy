@@ -62,7 +62,7 @@ function getClientFromConnection(connection) {
   return client;
 }
 
-async function saveConnection(userId, tokens, userEmail) {
+async function saveConnection(userId, tokens, userEmail, userName) {
   const db = getFirestore();
   const existing = await db
     .collection(COLLECTION)
@@ -70,11 +70,24 @@ async function saveConnection(userId, tokens, userEmail) {
     .limit(1)
     .get();
 
+  // Switching to a different Google account — wipe the old Gmail loops so
+  // stale loops from the previous account don't bleed through.
+  if (!existing.empty && userEmail && existing.docs[0].data().email &&
+      existing.docs[0].data().email !== userEmail) {
+    const loopsSnap = await db.collection("open_loops")
+      .where("user_id", "==", userId)
+      .where("source.adapter", "==", "gmail")
+      .get();
+    for (const doc of loopsSnap.docs) await doc.ref.delete();
+    console.log(`[google] Email changed for ${userId} — wiped ${loopsSnap.size} old Gmail loops`);
+  }
+
   const data = {
     user_id: userId,
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token || null,
     email: userEmail || null,
+    display_name: userName || null,
     scopes: SCOPES,
     connected: true,
     updated_at: new Date(),
@@ -101,13 +114,24 @@ async function getConnectionStatus(userId) {
 
 async function disconnectUser(userId) {
   const db = getFirestore();
-  const snap = await db
+  // Delete all Gmail/Calendar loops so they don't linger after disconnect.
+  const loopsSnap = await db.collection("open_loops")
+    .where("user_id", "==", userId)
+    .where("source.adapter", "==", "gmail")
+    .get();
+  for (const doc of loopsSnap.docs) await doc.ref.delete();
+  const calSnap = await db.collection("open_loops")
+    .where("user_id", "==", userId)
+    .where("source.adapter", "==", "calendar")
+    .get();
+  for (const doc of calSnap.docs) await doc.ref.delete();
+  const connSnap = await db
     .collection(COLLECTION)
     .where("user_id", "==", userId)
     .limit(1)
     .get();
-  if (!snap.empty) {
-    await snap.docs[0].ref.update({ connected: false, access_token: null, refresh_token: null });
+  if (!connSnap.empty) {
+    await connSnap.docs[0].ref.update({ connected: false, access_token: null, refresh_token: null });
   }
 }
 

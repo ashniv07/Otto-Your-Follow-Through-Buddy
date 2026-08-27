@@ -1,9 +1,36 @@
 const { google } = require("googleapis");
 require("../../core/firestoreClient"); // ensure firebase-admin is initialised
 const { getClientFromConnection } = require("../google/auth");
-const { extractFromCalendarTask } = require("./extractionAgent");
+const { extractFromCalendarTask, extractFromCalendarEvent } = require("./extractionAgent");
 const { investigateCalendarTask } = require("./investigatorAgent");
 const fixtures = require("./fixtures");
+
+async function fetchEventsFromGoogle(oauthClient) {
+  const calendarApi = google.calendar({ version: "v3", auth: oauthClient });
+  const now = new Date();
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  const res = await calendarApi.events.list({
+    calendarId: "primary",
+    timeMin: threeDaysAgo,
+    timeMax: tomorrow,
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults: 30,
+  });
+
+  return (res.data.items || [])
+    .filter((e) => e.status !== "cancelled" && e.summary)
+    .map((e) => ({
+      eventId: e.id,
+      title: e.summary,
+      description: e.description || "",
+      start: e.start?.dateTime || e.start?.date || "",
+      isAllDay: !!e.start?.date && !e.start?.dateTime,
+      attendeeCount: (e.attendees || []).filter((a) => !a.self).length,
+    }));
+}
 
 async function fetchTasksFromGoogle(oauthClient) {
   const tasksApi = google.tasks({ version: "v1", auth: oauthClient });
@@ -45,16 +72,15 @@ async function fetchNewItems(connection) {
 
   if (!connection?.access_token) return [];
   userId = connection.user_id;
+  const client = getClientFromConnection(connection);
+
+  // ── Tasks ──────────────────────────────────────────────────────────────────
   try {
-    const client = getClientFromConnection(connection);
     tasks = await fetchTasksFromGoogle(client);
-    if (!tasks.length) {
-      console.log("[calendar] No overdue tasks found for this account.");
-      return [];
-    }
+    if (!tasks.length) console.log("[calendar] No overdue tasks found.");
   } catch (err) {
     console.warn("[calendar] Tasks API failed:", err.message);
-    return [];
+    tasks = [];
   }
 
   const results = [];
@@ -64,7 +90,7 @@ async function fetchNewItems(connection) {
       results.push({
         user_id: userId,
         loop_type: "calendar",
-        source: { adapter: "calendar", source_id: task.taskId },
+        source: { adapter: "calendar", source_id: task.taskId, item_type: "task" },
         expected_state: extracted.expected_state,
         expected_by: extracted.expected_by,
         current_state: "not completed",
@@ -72,7 +98,6 @@ async function fetchNewItems(connection) {
         context: {
           raw_title: task.title,
           raw_summary: task.notes || task.title,
-          // task_list_id stored here so execute() can target the right list
           task_list_id: task.taskListId || "@default",
         },
       });
@@ -80,10 +105,48 @@ async function fetchNewItems(connection) {
       console.error("[calendar] extractFromCalendarTask failed:", err.message);
     }
   }
+
+  // ── Events ─────────────────────────────────────────────────────────────────
+  let events = [];
+  try {
+    events = await fetchEventsFromGoogle(client);
+  } catch (err) {
+    console.warn("[calendar] Calendar Events API failed:", err.message);
+  }
+
+  for (const event of events) {
+    try {
+      const extracted = await extractFromCalendarEvent(event);
+      if (!extracted.should_surface) {
+        console.log(`[calendar:event] skip "${event.title}"`);
+        continue;
+      }
+      console.log(`[calendar:event] surface "${event.title}"`);
+      results.push({
+        user_id: userId,
+        loop_type: "calendar",
+        source: { adapter: "calendar", source_id: event.eventId, item_type: "event" },
+        expected_state: extracted.expected_state,
+        expected_by: extracted.expected_by,
+        current_state: "not actioned",
+        stakes: extracted.stakes,
+        context: {
+          raw_title: extracted.title || event.title,
+          raw_summary: event.description || event.title,
+          ...(extracted.action_schema ? { action_schema: extracted.action_schema } : {}),
+        },
+      });
+    } catch (err) {
+      console.error("[calendar] extractFromCalendarEvent failed:", err.message);
+    }
+  }
+
   return results;
 }
 
 async function recheck(loop, connection) {
+  // Events have no completable status in the Calendar API — nothing to recheck.
+  if (loop.source?.item_type === "event") return loop.current_state;
   if (!connection?.access_token) return loop.current_state;
   try {
     const client = getClientFromConnection(connection);
@@ -109,6 +172,9 @@ async function investigate(loop, connection) {
 
 // Called by actionAgent for low-stakes loops routed to auto_resolving.
 async function execute(loop, connection) {
+  // Events don't have a completable status — their action_schema (compose/info)
+  // is handled by actionAgent/gmail; nothing extra to do here.
+  if (loop.source?.item_type === "event") return;
   if (!connection?.access_token) return;
   try {
     const client = getClientFromConnection(connection);

@@ -168,8 +168,8 @@ router.get("/google/callback", async (req, res) => {
   try {
     const tokens = await googleAuth.exchangeCode(code);
 
-    // Email is display-only — if userinfo fails, still save the connection.
     let userEmail = null;
+    let userName = null;
     try {
       const { google } = require("googleapis");
       const client = googleAuth.createOAuth2Client();
@@ -177,11 +177,12 @@ router.get("/google/callback", async (req, res) => {
       const oauth2 = google.oauth2({ version: "v2", auth: client });
       const info = await oauth2.userinfo.get();
       userEmail = info.data.email;
+      userName = info.data.name || null;
     } catch (emailErr) {
       console.warn("[google] userinfo fetch failed (non-fatal):", emailErr.message);
     }
 
-    await googleAuth.saveConnection(req.userId, tokens, userEmail);
+    await googleAuth.saveConnection(req.userId, tokens, userEmail, userName);
     res.redirect(`${FRONTEND_URL}/app?connected=google`);
   } catch (err) {
     console.error("Google OAuth callback failed:", err.message);

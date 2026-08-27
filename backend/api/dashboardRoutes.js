@@ -63,13 +63,21 @@ router.get("/loops", async (req, res) => {
     const loops = await firestoreClient.getAllLoops();
     const ownLoops = loops.filter((loop) => loop.user_id === req.userId);
 
-    // A disconnected/never-connected Notion adapter hides its loops rather
-    // than just freezing them — they reappear once reconnected (the loops
-    // themselves aren't touched, this is purely a visibility filter).
-    const notionConnected = await isNotionConnected(req.userId);
-    const visibleLoops = notionConnected
-      ? ownLoops
-      : ownLoops.filter((loop) => loop.source?.adapter !== "notion");
+    // Loops from a disconnected adapter are hidden until reconnected —
+    // this keeps the board empty when no account is active.
+    const [notionConnected, connections] = await Promise.all([
+      isNotionConnected(req.userId),
+      getConnectionsForUser(req.userId),
+    ]);
+    const googleConnected = connections.google.length > 0;
+
+    let visibleLoops = ownLoops;
+    if (!notionConnected)
+      visibleLoops = visibleLoops.filter((l) => l.source?.adapter !== "notion");
+    if (!googleConnected)
+      visibleLoops = visibleLoops.filter(
+        (l) => l.source?.adapter !== "gmail" && l.source?.adapter !== "calendar",
+      );
 
     res.json(visibleLoops.map(serializeLoop));
   } catch (err) {
@@ -87,8 +95,13 @@ router.post("/loops/:id/approve", async (req, res) => {
       return res.status(403).json({ error: "This loop belongs to another user" });
     }
 
-    const updated = await firestoreClient.updateLoop(loop.loop_id, { status: "auto_resolving" });
     const connections = await getConnectionsForUser(req.userId);
+    // Reject if the required adapter is no longer connected — prevents a
+    // loop from a disconnected account silently resolving without sending.
+    if (loop.source?.adapter === "gmail" && !connections.google.length) {
+      return res.status(400).json({ error: "Google account is not connected. Reconnect to send this email." });
+    }
+    const updated = await firestoreClient.updateLoop(loop.loop_id, { status: "auto_resolving" });
     const resolved = await resolveLoop(updated, connections);
     await firestoreClient.createPipelineEvent({ user_id: req.userId, type: "user_approved", loop_id: loop.loop_id, run_id: "run-manual-approval", message: `You approved: ${loop.context?.raw_title || loop.expected_state}` });
     res.json(serializeLoop(resolved));

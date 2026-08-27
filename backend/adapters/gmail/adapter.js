@@ -260,8 +260,15 @@ async function execute(loop, connection) {
     } catch { /* fall through */ }
   }
 
-  const body = schema?.body || loop.context?.proposed_action || "";
-  if (!body) return;
+  const rawBody = schema?.body || loop.context?.proposed_action || "";
+  if (!rawBody) return;
+
+  // Strip any LLM-generated generic sign-off, replace with the real sender's name.
+  const senderName = connection?.display_name || connection?.email?.split("@")[0] || "Me";
+  const strippedBody = rawBody
+    .replace(/\n+(?:Best(?: regards)?|Regards|Sincerely|Thanks|Thank you)[,.]?\s*\n+.*$/i, "")
+    .trimEnd();
+  const body = `${strippedBody}\n\nBest regards,\n${senderName}`;
 
   const lines = [
     toAddress ? `To: ${toAddress}` : "",

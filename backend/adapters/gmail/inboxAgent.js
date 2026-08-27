@@ -46,6 +46,9 @@ Set should_surface: false for:
 - ANY successful payment receipt or "payment processed" notification where no action is needed
 - Automated system alerts with no user action required
 - Spam
+- "X shared Y with you" notifications — access-grant emails where someone shares a document, dataset, spreadsheet, link, or file (Google Docs/Sheets, Notion, Kaggle, Claude, Dropbox, etc.) — the resource is already accessible, no reply needed
+- OTP, verification code, confirmation code, login code, 2FA code, or one-time password emails — these are transient security codes, never surface them
+- Notification-only emails from apps/services (e.g. Notion mentions, Slack codes, GitHub activity digests) where the email is purely informational and no email reply is expected
 
 Set should_surface: true for:
 - Job offers, internship invites, partnership proposals — even if they look like outreach
