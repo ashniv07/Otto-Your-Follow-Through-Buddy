@@ -6,8 +6,19 @@ const TASK_INSTRUCTION = `Today's date is ${TODAY}.
 
 You are an extraction agent. Given a Google Calendar task or reminder that is overdue, classify it and return ONLY a valid JSON object with no markdown or extra text.
 
-Return exactly these fields:
+FIRST check: is this task asking to clean up email from a specific sender —
+phrases like "clear spam from X", "unsubscribe from X", "clear subscription
+emails from X", "stop emails from X"? If so, return ONLY this JSON object:
 {
+  "loop_type": "unsubscribe",
+  "target_company": string — the company/sender name mentioned in the task (e.g. "Netflix", "LinkedIn"),
+  "expected_state": "unsubscribed and inbox cleared",
+  "expected_by": string — ISO date YYYY-MM-DD. Use the task's due date if provided; otherwise today.
+}
+
+Otherwise, return exactly these fields:
+{
+  "loop_type": "calendar_task",
   "expected_state": string — what "done" looks like for this task, phrased as a completed-state description (e.g. "car registration renewed", "bill paid", "expense report submitted to finance"),
   "expected_by": string — ISO date YYYY-MM-DD. Use the task's due date if provided; otherwise infer a reasonable deadline from the task title,
   "stakes": one of "low" | "money" | "irreversible" —

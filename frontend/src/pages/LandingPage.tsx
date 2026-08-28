@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle2,
@@ -57,7 +56,7 @@ const LOOP_TYPES = [
 ];
 
 export function LandingPage() {
-  const { loops, connections } = useOtto();
+  const { loops, connections, signIn } = useOtto();
 
   const heroLoop = loops.find((l) => l.id === "loop-002");
   const resolvedCount = loops.filter((l) => l.status === "resolved").length;
@@ -256,13 +255,14 @@ export function LandingPage() {
               <br />
               START KNOWING.
             </h2>
-            <Link
-              to="/app"
+            <button
+              type="button"
+              onClick={signIn}
               className="mt-10 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-[15px] font-semibold text-base-50 transition-colors hover:bg-accent-strong"
             >
               Get started free
               <ArrowRight size={16} />
-            </Link>
+            </button>
           </div>
 
           <footer className="mt-24 flex flex-col gap-4 border-t border-base-800 pt-6 text-[12px] text-base-500 sm:flex-row sm:items-center sm:justify-between">

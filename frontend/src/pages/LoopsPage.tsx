@@ -5,7 +5,7 @@ import { LoopColumn } from "../components/loops/LoopColumn";
 import { LoopDetailModal } from "../components/loops/LoopDetailModal";
 import { LoopFilterBar } from "../components/loops/LoopFilterBar";
 import { ResolvedDrawer } from "../components/loops/ResolvedDrawer";
-import { statusColumns, APPROVAL_STATUSES } from "../components/loops/loopMeta";
+import { statusColumns, APPROVAL_STATUSES, EDITABLE_ACTION_TYPES } from "../components/loops/loopMeta";
 import type { LoopType } from "../types";
 
 interface LoopsPageProps {
@@ -38,11 +38,11 @@ export function LoopsPage({ openId, onOpenChange, onNavigateToConnections }: Loo
     const map = new Map(BOARD_COLUMNS.map((c) => [c.id, [] as typeof loops]));
     for (const loop of filteredLoops) {
       if (APPROVAL_STATUSES.includes(loop.status as (typeof APPROVAL_STATUSES)[number])) {
-        // compose schema OR a proposed action Otto drafted (order investigations) → Stalled
-        const isCompose =
-          loop.context?.actionSchema?.type === "compose" ||
+        // Editable-draft schema OR a proposed action Otto drafted (order investigations) → Stalled
+        const isEditable =
+          (loop.context?.actionSchema && EDITABLE_ACTION_TYPES.includes(loop.context.actionSchema.type)) ||
           (!loop.context?.actionSchema && !!loop.context?.proposedAction);
-        const dest = isCompose ? "approve_action" : "mark_as_done";
+        const dest = isEditable ? "approve_action" : "mark_as_done";
         map.get(dest)?.push(loop);
       } else {
         const col = BOARD_COLUMNS.find((c) => c.statuses.includes(loop.status));

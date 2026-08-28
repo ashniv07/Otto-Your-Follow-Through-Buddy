@@ -66,6 +66,23 @@ async function fetchGoogleStatus(): Promise<GoogleConnectionState> {
   return res.json();
 }
 
+export interface SessionUser {
+  email: string;
+  name: string | null;
+  picture: string | null;
+}
+
+export interface SessionState {
+  authenticated: boolean;
+  user?: SessionUser;
+}
+
+async function fetchSession(): Promise<SessionState> {
+  const res = await fetch(`${API_BASE}/api/auth/session`, { credentials: "include" });
+  if (!res.ok) throw new Error(`GET /api/auth/session failed: ${res.status}`);
+  return res.json();
+}
+
 async function fetchNotionStatus(): Promise<NotionConnectionState> {
   const res = await fetch(`${API_BASE}/api/auth/notion/status`, { credentials: "include" });
   if (!res.ok) throw new Error(`GET /api/auth/notion/status failed: ${res.status}`);
@@ -95,6 +112,9 @@ interface OttoContextValue {
   connectGoogle: () => void;
   disconnectGoogle: () => void;
   refreshGoogleStatus: () => void;
+  session: SessionState | null;
+  signIn: () => void;
+  signOut: () => void;
 }
 
 const OttoContext = createContext<OttoContextValue | null>(null);
@@ -110,6 +130,33 @@ export function OttoProvider({ children }: { children: ReactNode }) {
   const [notionPages, setNotionPages] = useState<NotionPage[] | null>(null);
   const [notionPagesLoading, setNotionPagesLoading] = useState(false);
   const [googleConnection, setGoogleConnection] = useState<GoogleConnectionState | null>(null);
+  const [session, setSession] = useState<SessionState | null>(null);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      setSession(await fetchSession());
+    } catch (err) {
+      console.error("Failed to load session:", err);
+      setSession({ authenticated: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshSession();
+  }, [refreshSession]);
+
+  const signIn = useCallback(() => {
+    window.location.href = `${API_BASE}/api/auth/google/signin`;
+  }, []);
+
+  const signOut = useCallback(async () => {
+    try {
+      await fetch(`${API_BASE}/api/auth/signout`, { method: "POST", credentials: "include" });
+    } finally {
+      setSession({ authenticated: false });
+      window.location.href = "/";
+    }
+  }, []);
 
   const refreshLoops = useCallback(async () => {
     try {
@@ -129,7 +176,11 @@ export function OttoProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // These endpoints require a signed-in session — wait for it before polling,
+  // otherwise every unauthenticated page load (e.g. the landing page) spams
+  // the backend with 401s.
   useEffect(() => {
+    if (!session?.authenticated) return;
     refreshLoops();
     refreshPipelineEvents();
     const interval = window.setInterval(() => {
@@ -137,7 +188,7 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       refreshPipelineEvents();
     }, POLL_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [refreshLoops, refreshPipelineEvents]);
+  }, [session?.authenticated, refreshLoops, refreshPipelineEvents]);
 
   const refreshNotionStatus = useCallback(async () => {
     try {
@@ -148,8 +199,9 @@ export function OttoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!session?.authenticated) return;
     refreshNotionStatus();
-  }, [refreshNotionStatus]);
+  }, [session?.authenticated, refreshNotionStatus]);
 
   const connectNotion = useCallback(() => {
     window.location.href = `${API_BASE}/api/auth/notion/connect`;
@@ -196,8 +248,9 @@ export function OttoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!session?.authenticated) return;
     refreshGoogleStatus();
-  }, [refreshGoogleStatus]);
+  }, [session?.authenticated, refreshGoogleStatus]);
 
   const connectGoogle = useCallback(() => {
     window.location.href = `${API_BASE}/api/auth/google/connect`;
@@ -321,6 +374,9 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       connectGoogle,
       disconnectGoogle,
       refreshGoogleStatus,
+      session,
+      signIn,
+      signOut,
     }),
     [
       loops,
@@ -344,6 +400,9 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       connectGoogle,
       disconnectGoogle,
       refreshGoogleStatus,
+      session,
+      signIn,
+      signOut,
     ],
   );
 

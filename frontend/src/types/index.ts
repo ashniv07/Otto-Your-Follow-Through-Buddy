@@ -1,4 +1,13 @@
-export type LoopType = "order" | "subscription" | "calendar" | "note" | "opportunity" | "follow_up";
+export type LoopType =
+  | "order"
+  | "subscription"
+  | "calendar"
+  | "note"
+  | "opportunity"
+  | "follow_up"
+  | "docs"
+  | "unsubscribe"
+  | "file_request";
 
 export type LoopStatus =
   | "pending"
@@ -11,13 +20,28 @@ export type LoopStatus =
 export type Stakes = "low" | "money" | "irreversible";
 
 export interface ActionSchema {
-  type: "compose" | "info";
+  type: "compose" | "info" | "doc_reply" | "needs_resource" | "unsubscribe" | "file_share";
   to?: string;
   cc?: string;
   subject?: string;
   body?: string;
   headline?: string;
   detail?: string;
+  // doc_reply
+  replyText?: string;
+  // needs_resource
+  question?: string;
+  resourceAnswer?: string;
+  // unsubscribe
+  targetCompany?: string;
+  matchCount?: number;
+  method?: "one_click" | "link" | "mailto" | "not_found";
+  // file_share
+  fileId?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  fileSize?: number;
+  webViewLink?: string;
 }
 
 export interface OpenLoop {

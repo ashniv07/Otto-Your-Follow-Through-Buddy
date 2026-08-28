@@ -3,19 +3,37 @@ const { getFirestore } = require("firebase-admin/firestore");
 
 const COLLECTION = "google_connections";
 
+// Full data-access grant — Gmail/Calendar/Tasks/Docs/Drive. Requested only when
+// the user opts in on the Connections page (separate from signing in — see
+// SIGNIN_SCOPES below). `drive` (not `drive.readonly`/`drive.file`) is required
+// because the docs adapter reads/replies to comments on files it didn't create,
+// and the gmail file_request flow searches + shares arbitrary existing files.
+// `gmail.modify` (not just `readonly`) is required for the unsubscribe flow to
+// trash matched emails.
 const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/gmail.compose",
+  "https://www.googleapis.com/auth/gmail.settings.basic",
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/tasks",
+  "https://www.googleapis.com/auth/drive",
 ];
 
-function createOAuth2Client() {
+// Identity-only grant used purely to sign in and establish an Otto account —
+// deliberately excludes Gmail/Calendar/Drive access, which stays a separate
+// opt-in step (see SCOPES above / getAuthUrl below).
+const SIGNIN_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+];
+
+function createOAuth2Client(redirectUri = process.env.GOOGLE_REDIRECT_URI) {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    redirectUri
   );
 }
 
@@ -28,8 +46,17 @@ function getAuthUrl() {
   });
 }
 
-async function exchangeCode(code) {
-  const client = createOAuth2Client();
+function getSignInAuthUrl() {
+  const client = createOAuth2Client(process.env.GOOGLE_SIGNIN_REDIRECT_URI);
+  return client.generateAuthUrl({
+    access_type: "online",
+    scope: SIGNIN_SCOPES,
+    prompt: "select_account",
+  });
+}
+
+async function exchangeCode(code, redirectUri = process.env.GOOGLE_REDIRECT_URI) {
+  const client = createOAuth2Client(redirectUri);
   const { tokens } = await client.getToken(code);
   return tokens;
 }
@@ -114,17 +141,14 @@ async function getConnectionStatus(userId) {
 
 async function disconnectUser(userId) {
   const db = getFirestore();
-  // Delete all Gmail/Calendar loops so they don't linger after disconnect.
-  const loopsSnap = await db.collection("open_loops")
-    .where("user_id", "==", userId)
-    .where("source.adapter", "==", "gmail")
-    .get();
-  for (const doc of loopsSnap.docs) await doc.ref.delete();
-  const calSnap = await db.collection("open_loops")
-    .where("user_id", "==", userId)
-    .where("source.adapter", "==", "calendar")
-    .get();
-  for (const doc of calSnap.docs) await doc.ref.delete();
+  // Delete all Gmail/Calendar/Docs loops so they don't linger after disconnect.
+  for (const adapterName of ["gmail", "calendar", "docs"]) {
+    const loopsSnap = await db.collection("open_loops")
+      .where("user_id", "==", userId)
+      .where("source.adapter", "==", adapterName)
+      .get();
+    for (const doc of loopsSnap.docs) await doc.ref.delete();
+  }
   const connSnap = await db
     .collection(COLLECTION)
     .where("user_id", "==", userId)
@@ -135,14 +159,42 @@ async function disconnectUser(userId) {
   }
 }
 
+const USERS_COLLECTION = "users";
+
+// Called after the sign-in (identity-only) OAuth callback. `googleUserId` is
+// the stable Google account id ("sub") — that's what becomes the Otto
+// user_id, so the same Google account always maps to the same Otto account.
+async function upsertUser(googleUserId, { email, name, picture }) {
+  const db = getFirestore();
+  const ref = db.collection(USERS_COLLECTION).doc(googleUserId);
+  const existing = await ref.get();
+  const data = { user_id: googleUserId, email, name: name || null, picture: picture || null, updated_at: new Date() };
+  if (existing.exists) {
+    await ref.update(data);
+  } else {
+    await ref.set({ ...data, created_at: new Date() });
+  }
+  return { ...(existing.exists ? existing.data() : {}), ...data };
+}
+
+async function getUserById(userId) {
+  const db = getFirestore();
+  const doc = await db.collection(USERS_COLLECTION).doc(userId).get();
+  return doc.exists ? doc.data() : null;
+}
+
 module.exports = {
   COLLECTION,
   SCOPES,
+  SIGNIN_SCOPES,
   createOAuth2Client,
   getAuthUrl,
+  getSignInAuthUrl,
   exchangeCode,
   getClientFromConnection,
   saveConnection,
   getConnectionStatus,
   disconnectUser,
+  upsertUser,
+  getUserById,
 };
