@@ -5,4 +5,5 @@ module.exports = {
   notion: require("../adapters/notion/adapter"),
   gmail: require("../adapters/gmail/adapter"),
   calendar: require("../adapters/calendar/adapter"),
+  docs: require("../adapters/docs/adapter"),
 };

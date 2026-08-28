@@ -13,6 +13,13 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 const router = express.Router();
 
+const { requireSession } = require("../core/sessionMiddleware");
+const PUBLIC_PATHS = new Set(["/google/signin", "/google/signin/callback", "/session", "/signout"]);
+router.use((req, res, next) => {
+  if (PUBLIC_PATHS.has(req.path)) return next();
+  requireSession(req, res, next);
+});
+
 router.get("/notion/connect", (req, res) => {
   const url = new URL("https://api.notion.com/v1/oauth/authorize");
   url.searchParams.set("client_id", NOTION_CLIENT_ID);
@@ -206,6 +213,72 @@ router.delete("/google/disconnect", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Sign-in (identity only — separate from the "connect Google" grant above) ─
+const SESSION_COOKIE = "otto_session";
+const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
+
+router.get("/google/signin", (req, res) => {
+  res.redirect(googleAuth.getSignInAuthUrl());
+});
+
+router.get("/google/signin/callback", async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.redirect(`${FRONTEND_URL}/?error=signin_denied`);
+  }
+  try {
+    const tokens = await googleAuth.exchangeCode(code, process.env.GOOGLE_SIGNIN_REDIRECT_URI);
+
+    const { google } = require("googleapis");
+    const client = googleAuth.createOAuth2Client(process.env.GOOGLE_SIGNIN_REDIRECT_URI);
+    client.setCredentials(tokens);
+    const oauth2 = google.oauth2({ version: "v2", auth: client });
+    const info = await oauth2.userinfo.get();
+
+    if (!info.data.id || !info.data.email) {
+      throw new Error("Google sign-in did not return an account id/email");
+    }
+
+    await googleAuth.upsertUser(info.data.id, {
+      email: info.data.email,
+      name: info.data.name,
+      picture: info.data.picture,
+    });
+
+    res.cookie(SESSION_COOKIE, info.data.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      signed: true,
+      maxAge: SESSION_MAX_AGE_MS,
+      // Without an explicit path, the browser defaults it to the directory
+      // of the URL that set it (/api/auth/google/signin) — the cookie would
+      // never be sent to /api/auth/session, /loops, etc. Must be site-wide.
+      path: "/",
+    });
+    res.redirect(`${FRONTEND_URL}/app`);
+  } catch (err) {
+    console.error("Google sign-in callback failed:", err.message);
+    res.redirect(`${FRONTEND_URL}/?error=signin_failed`);
+  }
+});
+
+router.get("/session", async (req, res) => {
+  try {
+    const userId = req.signedCookies?.[SESSION_COOKIE];
+    if (!userId) return res.json({ authenticated: false });
+    const user = await googleAuth.getUserById(userId);
+    if (!user) return res.json({ authenticated: false });
+    res.json({ authenticated: true, user: { email: user.email, name: user.name, picture: user.picture } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/signout", (req, res) => {
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.json({ signedOut: true });
 });
 
 module.exports = router;

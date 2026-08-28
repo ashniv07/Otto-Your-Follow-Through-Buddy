@@ -1,5 +1,4 @@
 require("dotenv").config();
-const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -12,27 +11,22 @@ const app = express();
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
-app.use(cookieParser());
 
-// Anonymous "account" for the hackathon — no email/password. Every request
-// gets a stable random id in an httpOnly cookie, which is what ties a
-// browser to its Notion OAuth connection in notion_connections.
-app.use((req, res, next) => {
-  let userId = req.cookies?.otto_user_id;
-  if (!userId) {
-    userId = crypto.randomUUID();
-    res.cookie("otto_user_id", userId, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-    });
-  }
-  req.userId = userId;
-  next();
-});
+const COOKIE_SECRET = process.env.COOKIE_SECRET;
+if (!COOKIE_SECRET) {
+  throw new Error("COOKIE_SECRET env var is required (used to sign the sign-in session cookie)");
+}
+app.use(cookieParser(COOKIE_SECRET));
 
-app.use("/", dashboardRoutes);
+// Every request needs a real signed-in Otto account (see authRoutes.js
+// google/signin) — no more anonymous per-browser accounts. The guard is
+// applied inside dashboardRoutes/authRoutes themselves (not here). Order
+// matters here: authRoutes (mounted at the specific prefix "/api/auth") is
+// registered BEFORE dashboardRoutes (mounted at "/", which — being a prefix
+// of literally every path — would otherwise intercept /api/auth/* requests
+// first and never let them reach authRoutes at all).
 app.use("/api/auth", authRoutes);
+app.use("/", dashboardRoutes);
 
 const PORT = process.env.PORT || 8080;
 const SCHEDULER_INTERVAL_MS = Number(process.env.SCHEDULER_INTERVAL_MS) || 60_000;

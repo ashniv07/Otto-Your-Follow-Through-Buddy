@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { CalendarClock } from "lucide-react";
 import type { OpenLoop } from "../../types";
 import { Card } from "../ui/Card";
-import { loopTypeMeta, statusMeta } from "./loopMeta";
+import { loopTypeMeta, statusMeta, EDITABLE_ACTION_TYPES } from "./loopMeta";
 import { formatDateShort, timeAgo, daysOverdue } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { ApproveDeclineRow } from "./ApproveDeclineRow";
@@ -95,7 +95,8 @@ export function LoopCard({ loop, onOpen }: LoopCardProps) {
             <ApproveDeclineRow
               loopId={loop.id}
               approveLabel={
-                loop.context.actionSchema?.type === "compose" || (!loop.context.actionSchema && !!loop.context.proposedAction)
+                (loop.context.actionSchema && EDITABLE_ACTION_TYPES.includes(loop.context.actionSchema.type)) ||
+                (!loop.context.actionSchema && !!loop.context.proposedAction)
                   ? "Send"
                   : "Mark as Resolved"
               }

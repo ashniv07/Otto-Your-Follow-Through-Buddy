@@ -5,9 +5,12 @@ import {
   StickyNote,
   Briefcase,
   MessageSquare,
+  FileText,
+  MailX,
+  FileSearch,
   type LucideIcon,
 } from "lucide-react";
-import type { LoopStatus, LoopType, Stakes } from "../../types";
+import type { ActionSchema, LoopStatus, LoopType, Stakes } from "../../types";
 
 export const loopTypeMeta: Record<LoopType, { label: string; icon: LucideIcon }> = {
   order: { label: "Order", icon: Package },
@@ -16,7 +19,20 @@ export const loopTypeMeta: Record<LoopType, { label: string; icon: LucideIcon }>
   note: { label: "Note", icon: StickyNote },
   opportunity: { label: "Opportunity", icon: Briefcase },
   follow_up: { label: "Follow-up", icon: MessageSquare },
+  docs: { label: "Docs", icon: FileText },
+  unsubscribe: { label: "Unsubscribe", icon: MailX },
+  file_request: { label: "File request", icon: FileSearch },
 };
+
+// action_schema types whose approval flow needs an editable draft (routes to
+// the "Stalled" board column and shows a "Send"-style button), as opposed to
+// a read-only alert/summary (routes to "Acknowledge", "Mark as Resolved").
+export const EDITABLE_ACTION_TYPES: ActionSchema["type"][] = [
+  "compose",
+  "doc_reply",
+  "needs_resource",
+  "file_share",
+];
 
 export const statusMeta: Record<
   LoopStatus,

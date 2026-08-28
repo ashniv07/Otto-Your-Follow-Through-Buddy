@@ -16,8 +16,19 @@ You are extracting a personal commitment ("open loop") from a task in someone's 
 Task: "${rawItem.rawTitle}"
 ${dueDateLine}
 
-Return ONLY a JSON object with exactly these fields:
+FIRST check: is this task asking to clean up email from a specific sender —
+phrases like "clear spam from X", "unsubscribe from X", "clear subscription
+emails from X", "stop emails from X"? If so, return ONLY this JSON object:
 {
+  "loop_type": "unsubscribe",
+  "target_company": string — the company/sender name mentioned in the task (e.g. "Netflix", "LinkedIn"),
+  "expected_state": "unsubscribed and inbox cleared",
+  "expected_by": string — ISO 8601 date. ${expectedByInstruction}
+}
+
+Otherwise, return ONLY a JSON object with exactly these fields:
+{
+  "loop_type": "note",
   "expected_state": string — what "done" looks like for this task, phrased as a short completed-state description (e.g. "task completed", "email sent to landlord", "wish sent"),
   "expected_by": string — an ISO 8601 date (YYYY-MM-DD) by when this should be done. ${expectedByInstruction}
   "stakes": one of "low", "money", "irreversible" — "irreversible" if completing this involves an outbound message or commitment to another person (email, call, text, follow up with, RSVP, etc.), "money" if it involves a payment, purchase, subscription, or other financial commitment, otherwise "low"
@@ -33,6 +44,16 @@ Do not include any explanation, markdown formatting, or code fences — return t
 async function extractFromNotionItem(rawItem) {
   const prompt = buildPrompt(rawItem);
   const result = await geminiClient.generateJson(prompt);
+
+  if (result.loop_type === "unsubscribe") {
+    return {
+      loop_type: "unsubscribe",
+      expected_state: result.expected_state,
+      expected_by: rawItem.dueDate || result.expected_by,
+      stakes: "low",
+      target_company: result.target_company,
+    };
+  }
 
   return {
     loop_type: "note",

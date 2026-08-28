@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, CalendarClock, Check, FileText, Loader2, Search, Sparkles, X } from "lucide-react";
-import type { ActionSchema, OpenLoop } from "../../types";
+import { AlertCircle, CalendarClock, Check, FileText, Loader2, MailX, Search, Sparkles, X } from "lucide-react";
+import type { OpenLoop } from "../../types";
 import { loopTypeMeta, stakesMeta, statusMeta } from "./loopMeta";
 import { formatDate, formatDateTime, cn } from "../../lib/utils";
 import { ApproveDeclineRow } from "./ApproveDeclineRow";
@@ -50,12 +50,14 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
   const status = statusMeta[loop.status];
   const Icon = type.icon;
   const schema = loop.context.actionSchema;
-  const { approveLoop, declineLoop } = useOtto();
+  const { approveLoop, declineLoop, googleConnection } = useOtto();
 
   const [to, setTo] = useState(schema?.to ?? "");
   const [cc, setCc] = useState(schema?.cc ?? "");
   const [subject, setSubject] = useState(schema?.subject ?? "");
   const [body, setBody] = useState(schema?.body ?? "");
+  const [replyText, setReplyText] = useState(schema?.replyText ?? "");
+  const [resourceAnswer, setResourceAnswer] = useState(schema?.resourceAnswer ?? "");
   const [saving, setSaving] = useState(false);
 
   // Reset fields when a different loop is opened.
@@ -64,17 +66,19 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
     setCc(schema?.cc ?? "");
     setSubject(schema?.subject ?? "");
     setBody(schema?.body ?? "");
+    setReplyText(schema?.replyText ?? "");
+    setResourceAnswer(schema?.resourceAnswer ?? "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loop.id]);
 
-  async function handleComposeApprove() {
+  async function handlePatchApprove(edits: Record<string, string>) {
     setSaving(true);
     try {
       await fetch(`${API_BASE}/loops/${loop.id}/action-schema`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, cc, subject, body }),
+        body: JSON.stringify(edits),
       });
       await approveLoop(loop.id);
       onClose();
@@ -82,6 +86,11 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
       setSaving(false);
     }
   }
+
+  const handleComposeApprove = () => handlePatchApprove({ to, cc, subject, body });
+  const handleDocReplyApprove = () => handlePatchApprove({ replyText });
+  const handleNeedsResourceApprove = () => handlePatchApprove({ resourceAnswer });
+  const handleFileShareApprove = () => handlePatchApprove({ to, subject, body });
 
   return (
     <div>
@@ -167,6 +176,7 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
         {/* Compose action — editable draft with To / CC / Subject / Body */}
         {schema?.type === "compose" && (
           <Section icon={Sparkles} label="Proposed draft" accent>
+            <SendingAsNote googleConnection={googleConnection} />
             <div className="space-y-2.5">
               <Field label="To">
                 <input
@@ -209,6 +219,143 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
                 >
                   {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
                   {saving ? "Sending…" : "Send"}
+                </button>
+                <button
+                  onClick={() => { declineLoop(loop.id); onClose(); }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-base-800 px-3 py-1.5 text-[13px] font-medium text-base-300 transition-colors hover:bg-base-700"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* Doc comment reply — editable draft, approving posts + resolves the comment */}
+        {schema?.type === "doc_reply" && (
+          <Section icon={FileText} label="Proposed reply" accent>
+            <Field label="Reply">
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                rows={4}
+                className="w-full resize-y rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] leading-relaxed text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+              />
+            </Field>
+            {loop.status === "needs_approval" && (
+              <div className="mt-3.5 flex gap-2">
+                <button
+                  onClick={handleDocReplyApprove}
+                  disabled={saving || !replyText.trim()}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-accent-emerald/15 px-3 py-1.5 text-[13px] font-medium text-accent-emerald transition-colors hover:bg-accent-emerald/25 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  {saving ? "Posting…" : "Post reply"}
+                </button>
+                <button
+                  onClick={() => { declineLoop(loop.id); onClose(); }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-base-800 px-3 py-1.5 text-[13px] font-medium text-base-300 transition-colors hover:bg-base-700"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* Otto couldn't resolve the comment itself — asks the user for what's missing */}
+        {schema?.type === "needs_resource" && (
+          <Section icon={Search} label="Otto needs your input" accent>
+            <p className="text-[13px] leading-relaxed text-base-100">{schema.question}</p>
+            <div className="mt-2.5">
+              <Field label="Your answer">
+                <textarea
+                  value={resourceAnswer}
+                  onChange={(e) => setResourceAnswer(e.target.value)}
+                  rows={3}
+                  placeholder="Type what Otto should reply with…"
+                  className="w-full resize-y rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] leading-relaxed text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+            </div>
+            {loop.status === "needs_approval" && (
+              <div className="mt-3.5 flex gap-2">
+                <button
+                  onClick={handleNeedsResourceApprove}
+                  disabled={saving || !resourceAnswer.trim()}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-accent-emerald/15 px-3 py-1.5 text-[13px] font-medium text-accent-emerald transition-colors hover:bg-accent-emerald/25 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  {saving ? "Posting…" : "Post reply"}
+                </button>
+                <button
+                  onClick={() => { declineLoop(loop.id); onClose(); }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-base-800 px-3 py-1.5 text-[13px] font-medium text-base-300 transition-colors hover:bg-base-700"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* Unsubscribe — read-only summary, no fields to edit */}
+        {schema?.type === "unsubscribe" && (
+          <Section icon={MailX} label="Unsubscribe plan" accent>
+            <p className="text-[13px] leading-relaxed text-base-100">
+              {schema.matchCount === 0
+                ? `No emails found from ${schema.targetCompany}.`
+                : schema.method === "not_found"
+                  ? `${schema.matchCount} email${schema.matchCount === 1 ? "" : "s"} found from ${schema.targetCompany}, but no unsubscribe link was found on them. Approving will still move them to Trash and block future emails from this sender.`
+                  : `${schema.matchCount} email${schema.matchCount === 1 ? "" : "s"} from ${schema.targetCompany} will be unsubscribed (${schema.method?.replace("_", " ")}), moved to Trash, and future emails from this sender will be blocked automatically.`}
+            </p>
+            {loop.status === "needs_approval" && (
+              <ApproveDeclineRow loopId={loop.id} className="mt-3.5" approveLabel="Clear inbox" />
+            )}
+          </Section>
+        )}
+
+        {/* File request — matched Drive file, editable reply before attaching + sending */}
+        {schema?.type === "file_share" && (
+          <Section icon={FileText} label="Matched file" accent>
+            <p className="text-[13px] text-base-200">
+              Found <span className="font-medium text-base-50">{schema.fileName}</span> in Drive —
+              will be attached to the reply below.
+            </p>
+            <SendingAsNote googleConnection={googleConnection} />
+            <div className="mt-2.5 space-y-2.5">
+              <Field label="To">
+                <input
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="w-full rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+              <Field label="Subject">
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+              <Field label="Body">
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={4}
+                  className="w-full resize-y rounded-md border border-base-700 bg-base-900 px-2.5 py-1.5 text-[13px] leading-relaxed text-base-100 placeholder-base-600 outline-none focus:border-base-500"
+                />
+              </Field>
+            </div>
+            {loop.status === "needs_approval" && (
+              <div className="mt-3.5 flex gap-2">
+                <button
+                  onClick={handleFileShareApprove}
+                  disabled={saving}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-accent-emerald/15 px-3 py-1.5 text-[13px] font-medium text-accent-emerald transition-colors hover:bg-accent-emerald/25 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  {saving ? "Sending…" : "Attach & send"}
                 </button>
                 <button
                   onClick={() => { declineLoop(loop.id); onClose(); }}
@@ -279,5 +426,23 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-base-500">{label}</p>
       {children}
     </div>
+  );
+}
+
+// Makes explicit which mailbox will actually send this — always the account
+// connected on the Connections tab, never whatever Google account was used
+// to sign into Otto itself. Those are deliberately separate connections.
+function SendingAsNote({ googleConnection }: { googleConnection: { connected: boolean; email?: string | null } | null }) {
+  if (!googleConnection?.connected) {
+    return (
+      <p className="mb-2.5 text-[12px] text-accent-rose">
+        No Google account connected — connect one on the Connections tab before approving.
+      </p>
+    );
+  }
+  return (
+    <p className="mb-2.5 text-[12px] text-base-500">
+      Sending as <span className="font-medium text-base-300">{googleConnection.email}</span>
+    </p>
   );
 }

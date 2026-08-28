@@ -7,6 +7,9 @@ const { runSchedulerJob } = require("../core/schedulerJob");
 const db = getFirestore();
 const router = express.Router();
 
+const { requireSession } = require("../core/sessionMiddleware");
+router.use(requireSession);
+
 async function getConnectionsForUser(userId) {
   const [notionSnap, googleSnap] = await Promise.all([
     db.collection("notion_connections").where("user_id", "==", userId).limit(1).get(),
@@ -76,7 +79,7 @@ router.get("/loops", async (req, res) => {
       visibleLoops = visibleLoops.filter((l) => l.source?.adapter !== "notion");
     if (!googleConnected)
       visibleLoops = visibleLoops.filter(
-        (l) => l.source?.adapter !== "gmail" && l.source?.adapter !== "calendar",
+        (l) => l.source?.adapter !== "gmail" && l.source?.adapter !== "calendar" && l.source?.adapter !== "docs",
       );
 
     res.json(visibleLoops.map(serializeLoop));
@@ -132,14 +135,17 @@ router.post("/loops/:id/decline", async (req, res) => {
   }
 });
 
-// Lets the approval modal save edits to compose fields before the user clicks Approve.
+// Lets the approval modal save edits to action_schema fields before the user
+// clicks Approve — e.g. compose's to/cc/subject/body, doc_reply's replyText,
+// needs_resource's resourceAnswer. Merges whatever fields the frontend sends
+// (never overwrites `type`, which is what tells execute() how to act).
 router.patch("/loops/:id/action-schema", async (req, res) => {
   try {
     const loop = await firestoreClient.getLoopById(req.params.id);
     if (!loop || loop.user_id !== req.userId) return res.status(404).json({ error: "Not found" });
-    const { to, cc, subject, body } = req.body;
+    const { type: _ignoredType, ...edits } = req.body || {};
     const updated = await firestoreClient.updateLoop(loop.loop_id, {
-      "context.action_schema": { ...loop.context?.action_schema, to, cc, subject, body },
+      "context.action_schema": { ...loop.context?.action_schema, ...edits },
     });
     res.json(serializeLoop(updated));
   } catch (err) {
