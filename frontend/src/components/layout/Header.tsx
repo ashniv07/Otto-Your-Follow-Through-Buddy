@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Bot } from "lucide-react";
+import { Bot, LogOut } from "../../lib/icons";
+import { useOtto } from "../../hooks/useOttoStore";
 import { cn } from "../../lib/utils";
 
 export type TabKey = "loops" | "pipeline" | "connections";
@@ -17,6 +18,8 @@ interface HeaderProps {
 }
 
 export function Header({ active, onChange }: HeaderProps) {
+  const { session, signOut } = useOtto();
+
   return (
     <header className="sticky top-0 z-40 border-b border-base-800 bg-base-950/95 backdrop-blur">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 py-2.5">
@@ -51,12 +54,30 @@ export function Header({ active, onChange }: HeaderProps) {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-1.5 text-[12px] font-medium text-base-400 sm:flex">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-emerald opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-emerald" />
-          </span>
-          Agent online
+        <div className="flex items-center gap-4">
+          <div className="hidden items-center gap-1.5 text-[12px] font-medium text-base-400 sm:flex">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-emerald opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-emerald" />
+            </span>
+            Agent online
+          </div>
+
+          {session?.authenticated && (
+            <div className="flex items-center gap-2">
+              <span className="hidden max-w-[140px] truncate text-[12px] font-medium text-base-400 sm:inline">
+                {session.user?.name || session.user?.email}
+              </span>
+              <button
+                type="button"
+                onClick={signOut}
+                title="Sign out"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-base-400 transition-colors hover:bg-base-800 hover:text-base-100"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -1,18 +1,18 @@
-import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   HandHelping,
+  Mail,
   SearchCode,
   Sparkles,
-} from "lucide-react";
+} from "../lib/icons";
 import { useOtto } from "../hooks/useOttoStore";
-import { StackSection } from "../components/landing/StackSection";
 import { LandingNav } from "../components/landing/LandingNav";
 import { PhoneMockup } from "../components/landing/PhoneMockup";
 import { GrowthChart } from "../components/landing/GrowthChart";
 import { loopTypeMeta } from "../components/loops/loopMeta";
-import { cn } from "../lib/utils";
 
 // Google's own four brand colors — used once, here, as a small authentic
 // touch on the numbered steps rather than scattered everywhere.
@@ -42,253 +42,265 @@ const STEPS = [
 ];
 
 const LOOP_TYPES = [
-  {
-    type: "order" as const,
-    example: "A package frozen at “out for delivery” for four days.",
-  },
-  {
-    type: "subscription" as const,
-    example: "A quiet $15/mo price hike with no renewal notice.",
-  },
-  {
-    type: "calendar" as const,
-    example: "A passport renewal that's six days overdue.",
-  },
-  {
-    type: "note" as const,
-    example: "A security deposit nobody followed up on.",
-  },
+  { type: "order" as const, example: "A package frozen at “out for delivery” for four days." },
+  { type: "subscription" as const, example: "A quiet $15/mo price hike with no renewal notice." },
+  { type: "calendar" as const, example: "A passport renewal that's six days overdue." },
+  { type: "note" as const, example: "A security deposit nobody followed up on." },
 ];
 
-export function LandingPage() {
-  const { loops, connections } = useOtto();
+// Smooth, subtle scroll-reveal — the whole page used to rely on a sticky
+// "stack of cards" scroll-jack (each section pinned full-screen and the
+// next one slammed on top). That's what read as janky/not-smooth; a normal
+// document flow with a gentle fade-and-rise on scroll is the actual
+// pattern Google's own marketing pages use.
+const REVEAL = {
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.3 },
+  transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
+};
 
-  const heroLoop = loops.find((l) => l.id === "loop-002");
+export function LandingPage() {
+  const { loops, connections, signIn } = useOtto();
+
+  const heroLoop = loops.find((l) => l.status === "needs_approval") ?? loops[0];
   const resolvedCount = loops.filter((l) => l.status === "resolved").length;
   const needsApprovalCount = loops.filter((l) => l.status === "needs_approval").length;
   const connectedCount = connections.filter((c) => c.status === "connected").length;
 
   return (
-    <div className="google-theme bg-base-950">
+    <div className="bg-base-950">
       <LandingNav />
 
-      {/* ---------- 1. Hero ---------- */}
-      <StackSection index={0} rounded={false} className="bg-base-950">
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-10 pt-32 sm:pt-40">
-          <div className="max-w-[220px] text-[13px] leading-snug text-base-400">
-            <p>Trust Otto to handle it, or step in yourself — the choice stays yours.</p>
-            <p className="mt-3">Take the first step toward a life with no dropped threads.</p>
-          </div>
+      {/* ---------- Hero ---------- */}
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pb-16 pt-32 sm:pt-40 lg:flex-row lg:items-center lg:gap-16 lg:pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="max-w-xl"
+        >
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-base-800 bg-base-900 px-3 py-1 text-[12px] font-medium text-base-400">
+            <Sparkles size={13} className="text-accent" />
+            Built for the Google "All Things Agentic" hackathon
+          </span>
 
-          <div className="relative mt-8 flex-1">
-            <h1
-              className="select-none text-[15vw] font-black leading-[0.82] tracking-tight text-base-50 sm:text-[9rem] lg:text-[10.5rem]"
-              style={{ fontFamily: "var(--font-display)" }}
+          <h1 className="mt-5 text-[clamp(2.25rem,5.5vw,3.75rem)] font-black leading-[1.05] tracking-tight text-base-50">
+            Something stopped moving.
+            <br />
+            <span className="text-accent">Otto noticed.</span>
+          </h1>
+
+          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-base-400">
+            Otto watches Gmail, Calendar, and your notes for promises that quietly stalled — a
+            frozen delivery, a silent price hike, an overdue task — and either fixes them or asks
+            before it acts.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={signIn}
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-[15px] font-semibold text-base-900 transition-colors hover:bg-accent-strong"
             >
-              SOMETHING
-              <br />
-              STOPPED
-              <br />
-              MOVING
-            </h1>
-
-            <div className="mt-8 flex justify-end sm:mt-0 sm:absolute sm:bottom-[-2.5rem] sm:right-0 lg:right-10">
-              <PhoneMockup>
-                {heroLoop && <HeroLoopPreview title={heroLoop.title} note={heroLoop.currentState} action={heroLoop.context.proposedAction ?? ""} />}
-              </PhoneMockup>
-            </div>
-          </div>
-
-          <div className="mt-16 flex flex-col gap-6 border-t border-base-800 pt-6 sm:mt-24 sm:flex-row sm:items-start sm:justify-between">
-            <svg width="28" height="20" viewBox="0 0 28 20" fill="none" className="shrink-0 text-base-50">
-              <path d="M0 0L14 20L28 0H20L14 9L8 0H0Z" fill="currentColor" />
-            </svg>
-            <p className="max-w-xs text-[13px] leading-relaxed text-base-400">
-              Every stalled order, price hike, and overdue task caught automatically — across
-              Gmail, Calendar, and your notes.
-            </p>
-            <p className="max-w-xs text-[13px] leading-relaxed text-base-400">
-              Low-stakes fixes happen on their own. Anything with money or an irreversible step
-              waits for your approval.
-            </p>
-          </div>
-        </div>
-      </StackSection>
-
-      {/* ---------- 2. How it reads your life ---------- */}
-      <StackSection index={1} id="how-it-works" className="bg-base-900">
-        <div className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center gap-10 px-6 py-20 sm:py-28 lg:grid-cols-2">
-          <div>
-            <h2
-              className="text-[13vw] font-black leading-[0.9] tracking-tight text-base-50 sm:text-[4.5rem] lg:text-[5rem]"
-              style={{ fontFamily: "var(--font-display)" }}
+              Get started free
+              <ArrowRight size={16} />
+            </button>
+            <a
+              href="#how-it-works"
+              className="inline-flex items-center gap-2 rounded-full border border-base-800 px-6 py-3 text-[15px] font-semibold text-base-200 transition-colors hover:border-base-600 hover:text-base-50"
             >
-              WATCHES
-              <br />
-              EVERYTHING
-            </h2>
-            <p className="mt-6 max-w-md text-[15px] leading-relaxed text-base-400">
-              Otto reads Gmail receipts, Calendar tasks, and your notes — the same way you would,
-              just every night instead of never. No new app to obsessively check, no inbox
-              filters to maintain.
-            </p>
-
-            <h3
-              className="mt-14 text-[9vw] font-black leading-[0.9] tracking-tight text-base-700 sm:text-[3rem]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              INVESTIGATES QUIETLY
-            </h3>
+              See how it works
+            </a>
           </div>
 
-          <div className="flex justify-center lg:justify-end">
-            <PhoneMockup>
+          <p className="mt-5 text-[13px] text-base-500">
+            Free to try &middot; No credit card &middot; Disconnect anytime
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="mx-auto shrink-0 lg:mx-0"
+        >
+          <PhoneMockup>
+            {heroLoop ? (
+              <HeroLoopPreview
+                title={heroLoop.title}
+                note={heroLoop.currentState}
+                action={heroLoop.context.proposedAction ?? ""}
+              />
+            ) : (
               <PipelinePreview />
-            </PhoneMockup>
-          </div>
-        </div>
-      </StackSection>
+            )}
+          </PhoneMockup>
+        </motion.div>
+      </section>
 
-      {/* ---------- 3. Steps + live stats ---------- */}
-      <StackSection index={2} className="bg-base-950">
-        <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-20 sm:py-28">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-4">
-            {STEPS.map((step, i) => (
-              <div key={step.n}>
-                <div
-                  className="text-[4rem] font-black leading-none sm:text-[5rem]"
-                  style={{ fontFamily: "var(--font-display)", color: GOOGLE_COLORS[i] }}
-                >
-                  {step.n}
-                </div>
-                <h3 className="mt-3 text-[13px] font-semibold uppercase tracking-wide text-base-100">
-                  {step.title}
-                </h3>
-                <p className="mt-2 text-[13px] leading-relaxed text-base-400">{step.body}</p>
+      {/* ---------- Trust bar ---------- */}
+      <motion.section {...REVEAL} className="border-y border-base-800 bg-base-900">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-3 px-6 py-8 sm:grid-cols-4">
+          <StatCard label="Open loops tracked" value={loops.length} />
+          <StatCard label="Resolved so far" value={resolvedCount} />
+          <StatCard label="Waiting on your decision" value={needsApprovalCount} />
+          <StatCard label="Adapters connected" value={connectedCount} />
+        </div>
+      </motion.section>
+
+      {/* ---------- How it works ---------- */}
+      <section id="how-it-works" className="mx-auto w-full max-w-6xl px-6 py-20 sm:py-24">
+        <motion.div {...REVEAL} className="max-w-xl">
+          <h2 className="text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-tight tracking-tight text-base-50">
+            How Otto works
+          </h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-base-400">
+            Four steps, all running quietly in the background — nothing to check, nothing to
+            configure beyond connecting your accounts once.
+          </p>
+        </motion.div>
+
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((step, i) => (
+            <motion.div
+              key={step.n}
+              {...REVEAL}
+              transition={{ ...REVEAL.transition, delay: i * 0.08 }}
+              className="rounded-2xl border border-base-800 bg-base-900 p-5"
+            >
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold text-base-900"
+                style={{ backgroundColor: GOOGLE_COLORS[i] }}
+              >
+                {step.n}
               </div>
-            ))}
-          </div>
-
-          <div className="mt-20">
-            <h3 className="text-[13px] font-semibold uppercase tracking-wide text-base-400">
-              What Otto is watching right now
-            </h3>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard label="Open loops tracked" value={loops.length} />
-              <StatCard label="Resolved so far" value={resolvedCount} />
-              <StatCard label="Waiting on your decision" value={needsApprovalCount} />
-              <StatCard label="Adapters connected" value={connectedCount} />
-            </div>
-          </div>
+              <h3 className="mt-4 text-[14px] font-semibold text-base-50">{step.title}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-base-400">{step.body}</p>
+            </motion.div>
+          ))}
         </div>
-      </StackSection>
+      </section>
 
-      {/* ---------- 4. Cost of a silent loop (dark break) ---------- */}
-      <StackSection index={3} className="bg-base-50">
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 py-20 sm:py-28">
-          <h2
-            className="max-w-3xl text-[9vw] font-black leading-[0.95] tracking-tight text-accent sm:text-[3.5rem] lg:text-[4rem]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            WHAT DOES A LOOP LEFT ALONE COST YOU?
-          </h2>
-          <p className="mt-5 max-w-xl text-[14px] leading-relaxed text-base-500">
-            A subscription price hike nobody caught. A deposit nobody chased. Small amounts,
-            quietly compounding for as long as nothing happens — until Otto looks.
-          </p>
+      {/* ---------- Loop types ---------- */}
+      <section id="loop-types" className="bg-base-900">
+        <div className="mx-auto w-full max-w-6xl px-6 py-20 sm:py-24">
+          <motion.div {...REVEAL} className="max-w-xl">
+            <h2 className="text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-tight tracking-tight text-base-50">
+              Built for every kind of loop
+            </h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-base-400">
+              Delivery tracking, subscription billing, and your own calendar aren't separate
+              problems — they're the same event: a promise that quietly stopped moving.
+            </p>
+          </motion.div>
 
-          <div className="mt-14">
-            <GrowthChart
-              callouts={[
-                { label: "$51/mo saved — Adobe downgrade", x: 46, y: 40 },
-                { label: "$1,400 recovered — deposit chased", x: 88, y: 8 },
-              ]}
-            />
-          </div>
-        </div>
-      </StackSection>
-
-      {/* ---------- 5. Loop types ---------- */}
-      <StackSection index={4} id="loop-types" className="bg-base-900">
-        <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-20 sm:py-28">
-          <h2
-            className="max-w-2xl text-[10vw] font-black leading-[0.9] tracking-tight text-base-50 sm:text-[4rem]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            BUILT FOR EVERY KIND OF LOOP
-          </h2>
-          <p className="mt-5 max-w-lg text-[14px] leading-relaxed text-base-400">
-            Delivery tracking, subscription billing, expense reimbursement, and your own calendar
-            aren't four separate problems. They're the same event: a promise that quietly
-            stopped moving.
-          </p>
-
-          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {LOOP_TYPES.map(({ type, example }) => {
+          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {LOOP_TYPES.map(({ type, example }, i) => {
               const meta = loopTypeMeta[type];
               const Icon = meta.icon;
               return (
-                <div key={type} className="rounded-2xl border border-base-800 bg-base-850 p-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-base-950 text-base-100">
+                <motion.div
+                  key={type}
+                  {...REVEAL}
+                  transition={{ ...REVEAL.transition, delay: i * 0.06 }}
+                  className="rounded-2xl border border-base-800 bg-base-950 p-5"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-base-900 text-accent">
                     <Icon size={18} />
                   </span>
                   <h3 className="mt-4 text-sm font-semibold text-base-50">{meta.label}</h3>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-base-400">{example}</p>
-                </div>
+                </motion.div>
               );
             })}
           </div>
 
-          <div className="mt-12 flex flex-wrap gap-3" id="adapters">
-            <Pill icon={SearchCode} label="Reads Gmail" />
-            <Pill icon={Sparkles} label="Reads Calendar" />
+          <motion.div {...REVEAL} id="adapters" className="mt-8 flex flex-wrap gap-3">
+            <Pill icon={Mail} label="Reads Gmail" />
+            <Pill icon={SearchCode} label="Reads Calendar" />
             <Pill icon={HandHelping} label="Reads your notes" />
             <Pill icon={CheckCircle2} label="Acts only when safe" />
-          </div>
+          </motion.div>
         </div>
-      </StackSection>
+      </section>
 
-      {/* ---------- 6. Closing CTA ---------- */}
-      <StackSection index={5} className="bg-base-50">
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-between px-6 py-20 sm:py-28">
-          <div>
-            <h2
-              className="text-[13vw] font-black leading-[0.88] tracking-tight text-base-950 sm:text-[6.5rem] lg:text-[7.5rem]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              STOP CHECKING.
-              <br />
-              START KNOWING.
-            </h2>
-            <Link
-              to="/app"
-              className="mt-10 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-[15px] font-semibold text-base-900 transition-colors hover:bg-accent-strong"
-            >
-              Get started free
-              <ArrowRight size={16} />
-            </Link>
+      {/* ---------- Impact ---------- */}
+      <section className="mx-auto w-full max-w-6xl px-6 py-20 sm:py-24">
+        <motion.div {...REVEAL} className="overflow-hidden rounded-3xl border border-base-800 bg-base-900 p-6 sm:p-10">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center">
+            <div>
+              <h2 className="text-[clamp(1.5rem,3.5vw,2.25rem)] font-black leading-tight tracking-tight text-base-50">
+                What does a loop left alone cost you?
+              </h2>
+              <p className="mt-3 max-w-md text-[14px] leading-relaxed text-base-400">
+                A subscription price hike nobody caught. A deposit nobody chased. Small amounts,
+                quietly compounding for as long as nothing happens — until Otto looks.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-4">
+                <ImpactStat value="$51/mo" label="saved on an Adobe downgrade" />
+                <ImpactStat value="$1,400" label="recovered on a chased deposit" />
+              </div>
+            </div>
+            <GrowthChart
+              callouts={[
+                { label: "$51/mo saved", x: 46, y: 40 },
+                { label: "$1,400 recovered", x: 88, y: 8 },
+              ]}
+            />
           </div>
+        </motion.div>
+      </section>
 
-          <footer className="mt-24 flex flex-col gap-4 border-t border-base-800 pt-6 text-[12px] text-base-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>Otto — built for the Google “All Things Agentic” hackathon, Taskmaster track.</span>
-            <span>Not investment, legal, or financial advice. Demo data throughout.</span>
-          </footer>
+      {/* ---------- Closing CTA ---------- */}
+      <motion.section {...REVEAL} className="border-t border-base-800">
+        <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-6 py-20 text-center sm:py-28">
+          <h2 className="text-[clamp(1.75rem,4.5vw,3rem)] font-black leading-tight tracking-tight text-base-50">
+            Stop checking. Start knowing.
+          </h2>
+          <p className="mt-3 max-w-md text-[15px] leading-relaxed text-base-400">
+            Connect an account and Otto starts watching tonight.
+          </p>
+          <button
+            type="button"
+            onClick={signIn}
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 text-[15px] font-semibold text-base-900 transition-colors hover:bg-accent-strong"
+          >
+            Get started free
+            <ArrowRight size={16} />
+          </button>
         </div>
-      </StackSection>
+      </motion.section>
+
+      <footer className="border-t border-base-800">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-8 text-[12px] text-base-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>Otto — built for the Google "All Things Agentic" hackathon, Taskmaster track.</span>
+          <span>Not investment, legal, or financial advice. Demo data throughout.</span>
+        </div>
+      </footer>
     </div>
   );
 }
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-base-800 bg-base-900 p-4">
+    <div>
       <div className="text-2xl font-semibold text-base-50">{value}</div>
       <div className="mt-1 text-[12px] leading-snug text-base-400">{label}</div>
     </div>
   );
 }
 
-function Pill({ icon: Icon, label }: { icon: typeof SearchCode; label: string }) {
+function ImpactStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-xl border border-base-800 bg-base-950 px-4 py-3">
+      <div className="text-lg font-bold text-accent">{value}</div>
+      <div className="mt-0.5 text-[12px] text-base-400">{label}</div>
+    </div>
+  );
+}
+
+function Pill({ icon: Icon, label }: { icon: typeof Mail; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-base-800 bg-base-950 px-3 py-1.5 text-[12px] font-medium text-base-400">
       <Icon size={13} />
@@ -317,13 +329,16 @@ function HeroLoopPreview({
         </div>
       </div>
       <p className="mt-3 text-[12px] leading-relaxed text-base-950/60">{note}</p>
-      <div className="mt-4 rounded-xl bg-base-950/5 p-3">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-base-950/50">
-          Proposed action
-        </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-base-950/80">{action}</p>
-      </div>
-      <button className="mt-4 w-full rounded-lg bg-accent py-2.5 text-[13px] font-semibold text-base-900">
+      {action && (
+        <div className="mt-4 rounded-xl bg-base-950/5 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-base-950/50">
+            Proposed action
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-base-950/80">{action}</p>
+        </div>
+      )}
+      <button className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-2.5 text-[13px] font-semibold text-base-900">
+        <Check size={14} />
         Approve
       </button>
     </div>
@@ -348,7 +363,7 @@ function PipelinePreview() {
           </span>
           <div>
             <p className="text-[11px] font-semibold text-base-950/70">{row.label}</p>
-            <p className={cn("text-[12px] leading-snug text-base-950/60")}>{row.text}</p>
+            <p className="text-[12px] leading-snug text-base-950/60">{row.text}</p>
           </div>
         </div>
       ))}

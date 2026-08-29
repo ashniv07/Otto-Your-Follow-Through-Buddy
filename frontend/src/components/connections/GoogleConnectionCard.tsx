@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Mail, CalendarClock } from "lucide-react";
+import { Mail, CalendarClock } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
@@ -18,7 +18,7 @@ export function GoogleConnectionCard() {
           <Mail size={17} />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-base-50">Gmail &amp; Google Calendar</h3>
+          <h3 className="text-sm font-semibold text-base-50">Gmail, Calendar &amp; Drive</h3>
           <span
             className={cn(
               "mt-0.5 inline-flex items-center gap-1.5 text-[12px] font-medium",
@@ -48,8 +48,9 @@ export function GoogleConnectionCard() {
       </div>
 
       <p className="mt-3.5 text-[13px] leading-relaxed text-base-400">
-        Watches order confirmations and shipping emails for stalled deliveries, and tracks
-        overdue Google Tasks for completion.
+        Watches order confirmations and shipping emails for stalled deliveries, tracks overdue
+        Google Tasks for completion, and reads unresolved comments on your Docs/Slides and
+        requests to share a file from Drive — all still gated behind your approval.
       </p>
 
       {isConnected && (

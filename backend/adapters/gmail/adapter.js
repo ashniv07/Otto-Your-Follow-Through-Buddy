@@ -4,11 +4,17 @@ const { getClientFromConnection } = require("../google/auth");
 const { extractFromOrderEmail } = require("./extractionAgent");
 const { investigateOrder } = require("./investigatorAgent");
 const { classifyEmail } = require("./inboxAgent");
+const { searchDriveFile, downloadFileForAttachment, buildRawMessageWithAttachment } = require("./driveShareAgent");
 const fixtures = require("./fixtures");
 
-// Excluding spam/trash only — in:inbox was found to return 0 results on some accounts.
-// Thread-level dedup inside fetchGeneralEmailsFromGmail prevents Sent-copy duplicates.
-const GENERAL_SEARCH_QUERY = "newer_than:7d -in:spam -in:trash";
+// Excluding spam/trash/promo/social/forums — in:inbox was found to return 0
+// results on some accounts, so category exclusions do the pre-filtering
+// instead of scoping to inbox. Thread-level dedup inside
+// fetchGeneralEmailsFromGmail prevents Sent-copy duplicates. The LLM
+// classifier (inboxAgent.js) is still the second line of defense for spam
+// that doesn't land in Gmail's own promo/social tabs.
+const GENERAL_SEARCH_QUERY =
+  "newer_than:7d -in:spam -in:trash -category:promotions -category:social -category:forums";
 
 const SEARCH_QUERY =
   "(subject:(order confirmation OR order shipped OR your order OR has shipped OR order placed OR " +
@@ -217,23 +223,62 @@ async function recheck(loop, connection) {
   return loop.current_state;
 }
 
-async function investigate(loop, connection) {
+async function investigate(loop, connections = {}) {
   try {
-    // General loops already have action_schema from extraction — just promote to proposed_action.
-    if (loop.loop_type !== "order") {
-      const schema = loop.context?.action_schema;
-      if (schema?.type === "compose") return schema.body || "";
-      if (schema?.type === "info") return schema.detail || schema.headline || "";
-      return null;
+    if (loop.loop_type === "order") {
+      return await investigateOrder(loop);
     }
-    return await investigateOrder(loop);
+
+    // file_request loops carry a placeholder action_schema from extraction
+    // (searchQuery/to/subject only) — the actual Drive search happens here,
+    // lazily, once the loop is stalled, same reasoning as calendar tasks:
+    // don't spend a Drive call on every candidate email every tick.
+    if (loop.loop_type === "file_request") {
+      const draft = loop.context?.action_schema || {};
+      if (!connections.google?.access_token) return null;
+      const client = getClientFromConnection(connections.google);
+      const match = await searchDriveFile(client, draft.searchQuery);
+
+      if (!match) {
+        return {
+          proposedAction: `Couldn't find a file matching "${draft.searchQuery || "the request"}" in Drive.`,
+          actionSchema: {
+            type: "info",
+            headline: "No matching file found",
+            detail: `Otto searched Drive for "${draft.searchQuery || "a matching file"}" but didn't find anything to attach — you'll need to send this one manually.`,
+          },
+        };
+      }
+
+      return {
+        proposedAction: `Found "${match.fileName}" in Drive — approving will draft a reply to ${draft.to || "the requester"} with it attached.`,
+        actionSchema: {
+          type: "file_share",
+          to: draft.to,
+          subject: draft.subject || `Re: ${loop.context?.raw_title || "your request"}`,
+          body: `Hi,\n\nPlease find the attached file — ${match.fileName}.`,
+          fileId: match.fileId,
+          fileName: match.fileName,
+          fileMimeType: match.mimeType,
+          fileSize: match.size,
+          webViewLink: match.webViewLink,
+        },
+      };
+    }
+
+    // General loops already have action_schema from extraction — just promote to proposed_action.
+    const schema = loop.context?.action_schema;
+    if (schema?.type === "compose") return schema.body || "";
+    if (schema?.type === "info") return schema.detail || schema.headline || "";
+    return null;
   } catch (err) {
     console.error("[gmail] investigate failed:", err.message);
     return null;
   }
 }
 
-async function execute(loop, connection) {
+async function execute(loop, connections = {}) {
+  const connection = connections.google;
   if (!connection?.access_token) return;
   const schema = loop.context?.action_schema;
 
@@ -242,6 +287,35 @@ async function execute(loop, connection) {
 
   const client = getClientFromConnection(connection);
   const gmail = google.gmail({ version: "v1", auth: client });
+
+  // file_share: download the matched file and send it as an attachment —
+  // handled entirely separately from the generic plain-text send path below,
+  // since it needs a multipart MIME message rather than a plain text one.
+  if (schema?.type === "file_share" && schema.fileId && schema.to) {
+    try {
+      const attachment = await downloadFileForAttachment(client, {
+        fileId: schema.fileId,
+        fileName: schema.fileName,
+        mimeType: schema.fileMimeType,
+        size: schema.fileSize,
+      });
+      if (!attachment) {
+        console.error(`[gmail] "${schema.fileName}" is too large to attach — skipping send for loop ${loop.loop_id}`);
+        return;
+      }
+      const raw = buildRawMessageWithAttachment({
+        to: schema.to,
+        subject: schema.subject || `Re: ${loop.context?.raw_title || "your request"}`,
+        bodyText: schema.body || `Hi,\n\nPlease find the attached file — ${schema.fileName}.`,
+        attachment,
+      });
+      await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+      console.log(`[gmail] Sent "${attachment.fileName}" as attachment for loop ${loop.loop_id}`);
+    } catch (err) {
+      console.error("[gmail] file_share send failed:", err.message);
+    }
+    return;
+  }
 
   // Resolve To/Subject: prefer action_schema fields, fall back to thread lookup for orders.
   let toAddress = schema?.to || "";

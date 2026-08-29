@@ -1,7 +1,17 @@
 const { Timestamp } = require("firebase-admin/firestore");
 const { randomUUID } = require("crypto");
 
-const LOOP_TYPES = ["note", "subscription", "calendar", "order", "opportunity", "follow_up"];
+const LOOP_TYPES = ["note", "subscription", "calendar", "order", "opportunity", "follow_up", "docs", "unsubscribe", "file_request"];
+
+// Loop types that can never resolve on their own before their due date — a
+// Docs comment doesn't get answered by waiting, a file request doesn't send
+// itself, an unsubscribe task doesn't unsubscribe itself, and a subscription/
+// opportunity/follow-up email is inherently "waiting on you" from the moment
+// it's spotted. schedulerJob investigates and surfaces these immediately on
+// creation instead of sitting in "pending" until expected_by passes — unlike
+// order/calendar/note loops, which genuinely might resolve themselves (the
+// package arrives, the task gets done manually) and so are worth waiting on.
+const IMMEDIATE_LOOP_TYPES = ["docs", "unsubscribe", "file_request", "subscription", "opportunity", "follow_up"];
 const STATUSES = [
   "pending",
   "stalled",
@@ -36,20 +46,30 @@ function createOpenLoop(fields = {}) {
     loop_id: fields.loop_id || randomUUID(),
     user_id: fields.user_id,
     loop_type: fields.loop_type,
+    // Preserve every field an adapter puts on source (adapter, source_id,
+    // plus extras like calendar's item_type or docs' file_id) — a previous
+    // whitelist here silently dropped item_type, which broke event-vs-task
+    // handling downstream (schedulerJob's immediate-investigation check
+    // depends on source.item_type actually surviving to Firestore).
     source: {
-      adapter: fields.source?.adapter,
-      source_id: fields.source?.source_id,
+      ...fields.source,
     },
     expected_state: fields.expected_state,
     expected_by: toTimestamp(fields.expected_by),
     current_state: fields.current_state ?? "",
     status: fields.status || "pending",
+    // Same reasoning as source above — spread rather than whitelist, so
+    // adapter-specific extras (e.g. unsubscribe loops' target_company)
+    // survive. A whitelist here previously forced adapters to smuggle extra
+    // data through raw_title/raw_summary text, which broke when something
+    // else (recheck() syncing a renamed Notion page title) legitimately
+    // overwrote that same field.
     context: {
-      raw_title: fields.context?.raw_title || "",
-      raw_summary: fields.context?.raw_summary || "",
-      investigation_notes: fields.context?.investigation_notes || "",
-      proposed_action: fields.context?.proposed_action || "",
-      ...(fields.context?.action_schema ? { action_schema: fields.context.action_schema } : {}),
+      raw_title: "",
+      raw_summary: "",
+      investigation_notes: "",
+      proposed_action: "",
+      ...fields.context,
     },
     stakes: fields.stakes,
     created_at: fields.created_at ? toTimestamp(fields.created_at) : now,
@@ -88,6 +108,7 @@ function validateOpenLoop(loop) {
 
 module.exports = {
   LOOP_TYPES,
+  IMMEDIATE_LOOP_TYPES,
   STATUSES,
   STAKES,
   toTimestamp,

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Link2Off } from "lucide-react";
+import { Link2Off } from "../../lib/icons";
 import type { Connection } from "../../types";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";

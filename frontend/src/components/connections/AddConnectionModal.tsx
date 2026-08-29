@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Plug, X } from "lucide-react";
+import { Plug, X } from "../../lib/icons";
 import type { futureAdapters as FutureAdapters } from "../../lib/mockData";
 
 interface AddConnectionModalProps {

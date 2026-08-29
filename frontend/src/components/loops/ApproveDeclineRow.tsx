@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, X } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { cn } from "../../lib/utils";
 

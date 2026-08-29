@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, Menu, X } from "lucide-react";
+import { Bot, Menu, X } from "../../lib/icons";
+import { useOtto } from "../../hooks/useOttoStore";
 import { cn } from "../../lib/utils";
 
 const LINKS = [
@@ -11,6 +12,7 @@ const LINKS = [
 
 export function LandingNav() {
   const [open, setOpen] = useState(false);
+  const { signIn } = useOtto();
 
   return (
     <div className="fixed inset-x-0 top-4 z-[100] px-4">
@@ -35,18 +37,20 @@ export function LandingNav() {
         </div>
 
         <div className="hidden items-center gap-4 md:flex">
-          <Link
-            to="/app"
+          <button
+            type="button"
+            onClick={signIn}
             className="text-[13px] font-medium text-base-400 transition-colors hover:text-base-50"
           >
             Sign in
-          </Link>
-          <Link
-            to="/app"
+          </button>
+          <button
+            type="button"
+            onClick={signIn}
             className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-base-900 transition-colors hover:bg-accent-strong"
           >
             Get started
-          </Link>
+          </button>
         </div>
 
         <button
@@ -75,15 +79,20 @@ export function LandingNav() {
               {link.label}
             </a>
           ))}
-          <Link to="/app" className="py-2 text-[13px] font-medium text-base-300">
+          <button
+            type="button"
+            onClick={signIn}
+            className="py-2 text-left text-[13px] font-medium text-base-300"
+          >
             Sign in
-          </Link>
-          <Link
-            to="/app"
+          </button>
+          <button
+            type="button"
+            onClick={signIn}
             className="mt-1 rounded-full bg-accent px-4 py-2 text-center text-[13px] font-semibold text-base-900"
           >
             Get started
-          </Link>
+          </button>
         </div>
       </div>
     </div>

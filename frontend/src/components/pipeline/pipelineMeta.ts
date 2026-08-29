@@ -7,7 +7,7 @@ import {
   ThumbsUp,
   XCircle,
   type LucideIcon,
-} from "lucide-react";
+} from "../../lib/icons";
 import type { PipelineEventType } from "../../types";
 
 export const pipelineEventMeta: Record<

@@ -1,7 +1,7 @@
 const { getFirestore } = require("firebase-admin/firestore");
 const adapters = require("./adapterRegistry");
 const { createLoop, updateLoop, getLoopBySourceId, getAllActiveLoops, createPipelineEvent } = require("./firestoreClient");
-const { createOpenLoop } = require("./models");
+const { createOpenLoop, IMMEDIATE_LOOP_TYPES } = require("./models");
 const { isStalled } = require("./stallDetector");
 const { decide } = require("./policyEngine");
 const { resolveLoop } = require("./actionAgent");
@@ -37,7 +37,7 @@ async function runSchedulerJob() {
   for (const [adapterName, adapter] of Object.entries(adapters)) {
     const connections =
       adapterName === "notion" ? notionConnections
-      : adapterName === "gmail" || adapterName === "calendar" ? googleConnections
+      : adapterName === "gmail" || adapterName === "calendar" || adapterName === "docs" ? googleConnections
       : [undefined];
 
     for (const connection of connections) {
@@ -92,7 +92,7 @@ async function runSchedulerJob() {
       const adp = loop.source?.adapter;
       const connection =
         adp === "notion" ? notionConnections.find((c) => c.user_id === loop.user_id)
-        : adp === "gmail" || adp === "calendar" ? googleConnections.find((c) => c.user_id === loop.user_id)
+        : adp === "gmail" || adp === "calendar" || adp === "docs" ? googleConnections.find((c) => c.user_id === loop.user_id)
         : undefined;
       const newState = await adapter.recheck(loop, connection);
       if (newState && newState !== loop.current_state) {
@@ -123,20 +123,62 @@ async function runSchedulerJob() {
         continue;
       }
 
-      if (!isStalled(loop)) continue;
+      // Already sitting in front of the user (or already being resolved) —
+      // nothing left for the scheduler to do until they act. Without this,
+      // every tick would re-fire a duplicate "needs approval" pipeline event
+      // for anything still unapproved, forever.
+      if (loop.status === "needs_approval" || loop.status === "auto_resolving") continue;
 
-      // Run adapter's investigate() to populate proposed_action before routing.
-      // Skip if already investigated to avoid redundant ADK calls every tick.
+      // Loop types that can't resolve themselves by waiting (see
+      // IMMEDIATE_LOOP_TYPES) get investigated the moment they're created,
+      // regardless of expected_by — everything else waits until stalled.
+      // Calendar EVENTS are the same story even though "calendar" the loop
+      // type isn't in that list: their recheck() never changes current_state
+      // (there's no "mark done" concept for an event), so waiting for
+      // expected_by would mean only ever looking at an event after its start
+      // time — too late for prep/decline actions. Calendar TASKS stay
+      // gated on isStalled() since those genuinely can get completed
+      // manually in Google Tasks before their due date.
+      const isImmediate =
+        IMMEDIATE_LOOP_TYPES.includes(loop.loop_type) || loop.source?.item_type === "event";
+      if (!isImmediate && !isStalled(loop)) continue;
+
+      // Run adapter's investigate() to populate proposed_action (and, for
+      // adapters that need structured fields, context.action_schema) before
+      // routing. Skip if already investigated to avoid redundant ADK calls
+      // every tick. investigate() may return either a plain string (legacy
+      // contract: stored as-is in proposed_action) or
+      // { proposedAction, actionSchema } for adapters whose drafted action
+      // needs more than free text (unsubscribe match counts, doc replies,
+      // file-share candidates, etc).
       const stalledAdapter = adapters[loop.source?.adapter];
       if (stalledAdapter?.investigate && !loop.context?.proposed_action) {
         try {
-          const conn =
-            loop.source?.adapter === "notion" ? notionConnections.find(c => c.user_id === loop.user_id)
-            : googleConnections.find(c => c.user_id === loop.user_id);
-          const proposedAction = await stalledAdapter.investigate(loop, conn);
-          if (proposedAction) {
-            await updateLoop(loop.loop_id, { "context.proposed_action": proposedAction });
-            loop = { ...loop, context: { ...loop.context, proposed_action: proposedAction } };
+          const scopedConnections = {
+            notion: notionConnections.find(c => c.user_id === loop.user_id),
+            google: googleConnections.find(c => c.user_id === loop.user_id),
+          };
+          const investigation = await stalledAdapter.investigate(loop, scopedConnections);
+          if (investigation) {
+            const isStructured = typeof investigation === "object";
+            const proposedAction = isStructured ? investigation.proposedAction : investigation;
+            const actionSchema = isStructured ? investigation.actionSchema : undefined;
+
+            const patch = {};
+            if (proposedAction) patch["context.proposed_action"] = proposedAction;
+            if (actionSchema) patch["context.action_schema"] = actionSchema;
+
+            if (Object.keys(patch).length > 0) {
+              await updateLoop(loop.loop_id, patch);
+              loop = {
+                ...loop,
+                context: {
+                  ...loop.context,
+                  ...(proposedAction ? { proposed_action: proposedAction } : {}),
+                  ...(actionSchema ? { action_schema: actionSchema } : {}),
+                },
+              };
+            }
           }
         } catch (err) {
           summary.errors.push({ loopId: loop.loop_id, phase: "investigate", message: err.message });

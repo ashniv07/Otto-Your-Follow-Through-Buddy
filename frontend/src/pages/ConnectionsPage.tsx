@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus } from "../lib/icons";
 import { useOtto } from "../hooks/useOttoStore";
 import { ConnectionCard } from "../components/connections/ConnectionCard";
 import { NotionConnectionCard } from "../components/connections/NotionConnectionCard";
