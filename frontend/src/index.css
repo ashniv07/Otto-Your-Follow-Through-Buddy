@@ -76,3 +76,60 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-base-500);
 }
+
+/*
+ * Google-themed palette + typography — scoped to specific pages, not global
+ * (currently: LandingPage.tsx and LoopsPage.tsx carry this class on their
+ * root element). Tailwind's `bg-base-950` etc. compile to
+ * `var(--color-base-950)`, so redefining the same variable names on this
+ * ancestor class overrides them for every descendant — including modals
+ * and drawers rendered inline further down the same tree (LoopDetailModal,
+ * ResolvedDrawer aren't portaled) — without touching the global @theme
+ * block the rest of the app (Pipeline, Connections) relies on.
+ */
+.google-theme {
+  --font-sans: "Roboto", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Roboto", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* `body { font-family / background-color: var(--color-base-950) }` sets
+     these once, globally, and every descendant just *inherits that already-
+     resolved value* — redefining the variable above doesn't retroactively
+     change what body already locked in. Re-declaring both properties here,
+     using the now-overridden variables, forces every element inside this
+     scope to recompute from the Google values instead of inheriting Inter/
+     cream from body. */
+  font-family: var(--font-sans);
+  background-color: var(--color-base-950);
+
+  /* Google's actual Material/Workspace neutral scale (Grey 50 -> Grey 900,
+     plus text-primary/text-secondary), mapped onto the same "950 = furthest
+     back surface, 50 = most prominent text" direction the app already uses. */
+  --color-base-950: #f1f3f4;
+  --color-base-900: #ffffff;
+  --color-base-850: #f8f9fa;
+  --color-base-800: #e8eaed;
+  --color-base-700: #dadce0;
+  --color-base-600: #bdc1c6;
+  --color-base-500: #9aa0a6;
+  --color-base-400: #80868b;
+  --color-base-300: #5f6368;
+  --color-base-200: #3c4043;
+  --color-base-100: #202124;
+  --color-base-50: #202124;
+
+  /* Google Blue — the one accent used for fills (buttons, callouts). Pairs
+     with white text (`text-base-900`, which is white in this palette), not
+     the dark text the lime accent elsewhere in the app pairs with. */
+  --color-accent: #1a73e8;
+  --color-accent-strong: #185abc;
+
+  /* Status colors — Google's own published Material text-on-white tones
+     (the same reds/blues/greens/yellows Gmail and Workspace use for status
+     text), not the brighter fill-only 500-tier brand colors — these need
+     to stay readable as small text, not just dot fills. */
+  --color-accent-amber: #b06000;
+  --color-accent-blue: #1967d2;
+  --color-accent-violet: #9334e6;
+  --color-accent-emerald: #188038;
+  --color-accent-rose: #d93025;
+}

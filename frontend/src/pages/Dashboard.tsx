@@ -37,7 +37,7 @@ export function Dashboard() {
 
   return (
     <>
-      <PageBackground />
+      <PageBackground google={activeTab === "loops"} />
       <Header active={activeTab} onChange={setActiveTab} />
 
       <main className="mx-auto max-w-[1600px] px-6 py-6">

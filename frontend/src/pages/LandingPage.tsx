@@ -14,6 +14,10 @@ import { GrowthChart } from "../components/landing/GrowthChart";
 import { loopTypeMeta } from "../components/loops/loopMeta";
 import { cn } from "../lib/utils";
 
+// Google's own four brand colors — used once, here, as a small authentic
+// touch on the numbered steps rather than scattered everywhere.
+const GOOGLE_COLORS = ["#4285F4", "#EA4335", "#FBBC05", "#34A853"];
+
 const STEPS = [
   {
     n: "1",
@@ -65,7 +69,7 @@ export function LandingPage() {
   const connectedCount = connections.filter((c) => c.status === "connected").length;
 
   return (
-    <div className="bg-base-950">
+    <div className="google-theme bg-base-950">
       <LandingNav />
 
       {/* ---------- 1. Hero ---------- */}
@@ -78,7 +82,7 @@ export function LandingPage() {
 
           <div className="relative mt-8 flex-1">
             <h1
-              className="select-none text-[15vw] leading-[0.82] tracking-tight text-base-50 sm:text-[9rem] lg:text-[10.5rem]"
+              className="select-none text-[15vw] font-black leading-[0.82] tracking-tight text-base-50 sm:text-[9rem] lg:text-[10.5rem]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               SOMETHING
@@ -116,7 +120,7 @@ export function LandingPage() {
         <div className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center gap-10 px-6 py-20 sm:py-28 lg:grid-cols-2">
           <div>
             <h2
-              className="text-[13vw] leading-[0.9] tracking-tight text-base-50 sm:text-[4.5rem] lg:text-[5rem]"
+              className="text-[13vw] font-black leading-[0.9] tracking-tight text-base-50 sm:text-[4.5rem] lg:text-[5rem]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               WATCHES
@@ -130,7 +134,7 @@ export function LandingPage() {
             </p>
 
             <h3
-              className="mt-14 text-[9vw] leading-[0.9] tracking-tight text-base-700 sm:text-[3rem]"
+              className="mt-14 text-[9vw] font-black leading-[0.9] tracking-tight text-base-700 sm:text-[3rem]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               INVESTIGATES QUIETLY
@@ -149,11 +153,11 @@ export function LandingPage() {
       <StackSection index={2} className="bg-base-950">
         <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-20 sm:py-28">
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-4">
-            {STEPS.map((step) => (
+            {STEPS.map((step, i) => (
               <div key={step.n}>
                 <div
-                  className="text-[4rem] leading-none text-base-50 sm:text-[5rem]"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  className="text-[4rem] font-black leading-none sm:text-[5rem]"
+                  style={{ fontFamily: "var(--font-display)", color: GOOGLE_COLORS[i] }}
                 >
                   {step.n}
                 </div>
@@ -183,7 +187,7 @@ export function LandingPage() {
       <StackSection index={3} className="bg-base-50">
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 py-20 sm:py-28">
           <h2
-            className="max-w-3xl text-[9vw] leading-[0.95] tracking-tight text-accent sm:text-[3.5rem] lg:text-[4rem]"
+            className="max-w-3xl text-[9vw] font-black leading-[0.95] tracking-tight text-accent sm:text-[3.5rem] lg:text-[4rem]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             WHAT DOES A LOOP LEFT ALONE COST YOU?
@@ -208,7 +212,7 @@ export function LandingPage() {
       <StackSection index={4} id="loop-types" className="bg-base-900">
         <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-20 sm:py-28">
           <h2
-            className="max-w-2xl text-[10vw] leading-[0.9] tracking-tight text-base-50 sm:text-[4rem]"
+            className="max-w-2xl text-[10vw] font-black leading-[0.9] tracking-tight text-base-50 sm:text-[4rem]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             BUILT FOR EVERY KIND OF LOOP
@@ -249,7 +253,7 @@ export function LandingPage() {
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-between px-6 py-20 sm:py-28">
           <div>
             <h2
-              className="text-[13vw] leading-[0.88] tracking-tight text-base-950 sm:text-[6.5rem] lg:text-[7.5rem]"
+              className="text-[13vw] font-black leading-[0.88] tracking-tight text-base-950 sm:text-[6.5rem] lg:text-[7.5rem]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               STOP CHECKING.
@@ -258,7 +262,7 @@ export function LandingPage() {
             </h2>
             <Link
               to="/app"
-              className="mt-10 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-[15px] font-semibold text-base-50 transition-colors hover:bg-accent-strong"
+              className="mt-10 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-[15px] font-semibold text-base-900 transition-colors hover:bg-accent-strong"
             >
               Get started free
               <ArrowRight size={16} />
@@ -319,7 +323,7 @@ function HeroLoopPreview({
         </p>
         <p className="mt-1 text-[12px] leading-relaxed text-base-950/80">{action}</p>
       </div>
-      <button className="mt-4 w-full rounded-lg bg-accent py-2.5 text-[13px] font-semibold text-base-50">
+      <button className="mt-4 w-full rounded-lg bg-accent py-2.5 text-[13px] font-semibold text-base-900">
         Approve
       </button>
     </div>
