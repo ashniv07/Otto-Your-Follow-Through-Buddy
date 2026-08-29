@@ -9,7 +9,7 @@ import {
   MailX,
   FileSearch,
   type LucideIcon,
-} from "lucide-react";
+} from "../../lib/icons";
 import type { ActionSchema, LoopStatus, LoopType, Stakes } from "../../types";
 
 export const loopTypeMeta: Record<LoopType, { label: string; icon: LucideIcon }> = {

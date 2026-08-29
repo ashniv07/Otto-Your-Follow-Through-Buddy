@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronLeft, Unplug } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Unplug } from "../lib/icons";
 import { useOtto } from "../hooks/useOttoStore";
 import { LoopColumn } from "../components/loops/LoopColumn";
 import { LoopDetailModal } from "../components/loops/LoopDetailModal";
@@ -78,7 +78,7 @@ export function LoopsPage({ openId, onOpenChange, onNavigateToConnections }: Loo
           <button
             type="button"
             onClick={onNavigateToConnections}
-            className="rounded-lg bg-accent-lime px-4 py-2 text-sm font-semibold text-base-950 transition-opacity hover:opacity-90"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-base-900 transition-opacity hover:opacity-90"
           >
             Go to Connections
           </button>

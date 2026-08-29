@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { RotateCw, Radio } from "lucide-react";
+import { RotateCw, Radio } from "../lib/icons";
 import { useOtto } from "../hooks/useOttoStore";
 import { PipelineTimeline } from "../components/pipeline/PipelineTimeline";
 import { Button } from "../components/ui/Button";

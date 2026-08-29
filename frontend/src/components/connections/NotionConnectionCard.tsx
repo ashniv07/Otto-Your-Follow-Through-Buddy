@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { NotebookText } from "lucide-react";
+import { NotebookText } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";

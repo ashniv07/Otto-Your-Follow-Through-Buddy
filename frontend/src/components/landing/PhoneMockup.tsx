@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, Bell, Star } from "lucide-react";
+import { ArrowLeft, Bell, Star } from "../../lib/icons";
 
 export function PhoneMockup({ children }: { children: ReactNode }) {
   return (

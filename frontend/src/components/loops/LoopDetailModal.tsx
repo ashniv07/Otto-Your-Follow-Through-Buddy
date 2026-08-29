@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, CalendarClock, Check, FileText, Loader2, MailX, Search, Sparkles, X } from "lucide-react";
+import { AlertCircle, CalendarClock, Check, FileText, Loader2, MailX, Search, Sparkles, X } from "../../lib/icons";
 import type { OpenLoop } from "../../types";
 import { loopTypeMeta, stakesMeta, statusMeta } from "./loopMeta";
 import { formatDate, formatDateTime, cn } from "../../lib/utils";

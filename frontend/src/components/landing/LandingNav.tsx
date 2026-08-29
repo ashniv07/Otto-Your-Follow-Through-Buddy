@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, Menu, X } from "lucide-react";
+import { Bot, Menu, X } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { cn } from "../../lib/utils";
 
@@ -18,7 +18,7 @@ export function LandingNav() {
     <div className="fixed inset-x-0 top-4 z-[100] px-4">
       <nav className="mx-auto flex max-w-5xl items-center justify-between rounded-full border border-base-800/60 bg-base-900/90 px-4 py-2.5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)] backdrop-blur-md sm:px-5">
         <Link to="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-base-50 text-base-950">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-base-900">
             <Bot size={16} strokeWidth={2.4} />
           </span>
           <span className="text-[15px] font-semibold tracking-tight text-base-50">Otto</span>
@@ -47,7 +47,7 @@ export function LandingNav() {
           <button
             type="button"
             onClick={signIn}
-            className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-base-50 transition-colors hover:bg-accent-strong"
+            className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-base-900 transition-colors hover:bg-accent-strong"
           >
             Get started
           </button>
@@ -89,7 +89,7 @@ export function LandingNav() {
           <button
             type="button"
             onClick={signIn}
-            className="mt-1 rounded-full bg-accent px-4 py-2 text-center text-[13px] font-semibold text-base-50"
+            className="mt-1 rounded-full bg-accent px-4 py-2 text-center text-[13px] font-semibold text-base-900"
           >
             Get started
           </button>

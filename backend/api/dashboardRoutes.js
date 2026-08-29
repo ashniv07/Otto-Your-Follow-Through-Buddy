@@ -155,25 +155,30 @@ router.patch("/loops/:id/action-schema", async (req, res) => {
 
 router.get("/pipeline-events", async (req, res) => {
   try {
+    // Equality-only filter (no .orderBy on a different field) deliberately —
+    // that combination needs a Firestore composite index that was never
+    // created, which made this endpoint 500 on every single request. Sorting
+    // in JS instead avoids needing one at all; fine at this collection size.
     const snap = await db
       .collection("pipeline_events")
       .where("user_id", "==", req.userId)
-      .orderBy("timestamp", "desc")
-      .limit(200)
       .get();
-    const events = snap.docs.map((doc) => {
-      const d = doc.data();
-      const ts = d.timestamp;
-      const iso = ts?.toDate ? ts.toDate().toISOString() : ts ? new Date(ts).toISOString() : new Date().toISOString();
-      return {
-        id: doc.id,
-        timestamp: iso,
-        type: d.type,
-        message: d.message,
-        loopId: d.loop_id ?? undefined,
-        runId: d.run_id ?? undefined,
-      };
-    });
+    const events = snap.docs
+      .map((doc) => {
+        const d = doc.data();
+        const ts = d.timestamp;
+        const iso = ts?.toDate ? ts.toDate().toISOString() : ts ? new Date(ts).toISOString() : new Date().toISOString();
+        return {
+          id: doc.id,
+          timestamp: iso,
+          type: d.type,
+          message: d.message,
+          loopId: d.loop_id ?? undefined,
+          runId: d.run_id ?? undefined,
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 200);
     res.json(events);
   } catch (err) {
     res.status(500).json({ error: err.message });

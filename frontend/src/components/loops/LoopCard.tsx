@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock } from "../../lib/icons";
 import type { OpenLoop } from "../../types";
 import { Card } from "../ui/Card";
 import { loopTypeMeta, statusMeta, EDITABLE_ACTION_TYPES } from "./loopMeta";

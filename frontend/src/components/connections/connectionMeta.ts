@@ -1,4 +1,4 @@
-import { Mail, CalendarClock, NotebookText, type LucideIcon } from "lucide-react";
+import { Mail, CalendarClock, NotebookText, type LucideIcon } from "../../lib/icons";
 
 export const connectionIcons: Record<string, LucideIcon> = {
   "conn-gmail": Mail,

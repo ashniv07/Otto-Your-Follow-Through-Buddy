@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Mail, CalendarClock } from "lucide-react";
+import { Mail, CalendarClock } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";

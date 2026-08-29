@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Bot, LogOut } from "lucide-react";
+import { Bot, LogOut } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { cn } from "../../lib/utils";
 

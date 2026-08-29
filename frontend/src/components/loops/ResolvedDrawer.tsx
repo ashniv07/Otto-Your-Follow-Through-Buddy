@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { X } from "../../lib/icons";
 import type { OpenLoop } from "../../types";
 import { LoopCard } from "./LoopCard";
 import { statusMeta } from "./loopMeta";
