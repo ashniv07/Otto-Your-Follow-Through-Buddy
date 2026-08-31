@@ -1,12 +1,39 @@
+<div align="center">
+
 # Otto
 
-An open-loop tracking agent — built for the Google "All Things Agentic" hackathon (Taskmaster
+**The agent that finishes what you forgot.**
+
+An open-loop tracking agent built for Google's **"All Things Agentic" Hackathon** (Taskmaster
 track). Otto watches Gmail, Google Calendar/Tasks, Drive/Docs, and Notion for personal
 commitments that quietly stalled, tracks them as **Open Loops** in Firestore, and either finishes
 them for real or asks for your approval first — depending on how risky the action is.
 
-Every adapter is real — no mock data, no stubs. All four (Notion, Gmail, Calendar, Docs) read
-and write against live, OAuth-connected accounts.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Hackathon](https://img.shields.io/badge/Google-All%20Things%20Agentic%20Hackathon-1a73e8)
+![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
+
+[Demo Video](https://youtu.be/LYbVzjSTPK4?feature=shared) · [Report an Issue](../../issues)
+
+</div>
+
+> Every adapter is real — no mock data, no stubs. All four (Notion, Gmail, Calendar, Docs) read
+> and write against live, OAuth-connected accounts.
+
+> [!NOTE]
+> The **Live Demo** and **Demo Video** links above are placeholders — swap them for the real
+> Cloud Run URL and recorded video link before submitting.
+
+## Contents
+
+- [Layout](#layout)
+- [Getting started](#getting-started)
+- [Environment variables](#environment-variables)
+- [What's built](#whats-built)
+- [The lifecycle, concretely](#the-lifecycle-concretely)
+- [Deploying](#deploying)
+- [Reproducible testing](#reproducible-testing)
+- [License](#license)
 
 ## Layout
 
@@ -26,7 +53,7 @@ and write against live, OAuth-connected accounts.
 Dockerfile, .dockerignore, .gcloudignore   Cloud Run deployment
 ```
 
-## Run it
+## Getting started
 
 Two commands, both from this directory (`Otto-Your-Follow-Through-Buddy`) — no need to `cd` into
 `frontend/` or `backend/`:
@@ -43,7 +70,9 @@ npm run frontend   # starts the dashboard on http://localhost:5173 (open it, the
 server keeps executing whatever was on disk when it started. The frontend (Vite) hot-reloads on
 save automatically; the backend does not.
 
-### `.env` (repo root, gitignored)
+## Environment variables
+
+`.env`, repo root, gitignored:
 
 ```
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
@@ -211,3 +240,7 @@ a real connected account. Steps to independently reproduce and verify each claim
    interval far shorter than a real tick takes) and confirm the console logs
    `[scheduler] Previous tick still running — skipping this interval to avoid overlap.` instead of
    multiple ticks running concurrently.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
