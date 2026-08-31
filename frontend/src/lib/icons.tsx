@@ -15,18 +15,27 @@ export interface IconProps {
   /** Accepted for lucide-prop compatibility; nudges the variable font's
       weight axis heavier, since Material Symbols has no literal stroke. */
   strokeWidth?: number;
+  /** Solid/flat variant (Material Symbols' FILL axis) instead of outline —
+      reads closer to a flat icon set, better weight for sitting inside a
+      tinted chip/circle than the thin outline default. */
+  filled?: boolean;
+  /** Escape hatch for per-instance styling (e.g. a dynamic brand color) that
+      doesn't warrant its own prop. Merged over the icon's own sizing/font
+      styles, so it can override color but not size. */
+  style?: CSSProperties;
 }
 
 export type LucideIcon = (props: IconProps) => React.JSX.Element;
 
 function makeIcon(symbolName: string): LucideIcon {
-  function IconComponent({ size = 16, className, strokeWidth }: IconProps) {
+  function IconComponent({ size = 16, className, strokeWidth, filled, style: styleOverride }: IconProps) {
     const weight = strokeWidth ? Math.round(300 + strokeWidth * 100) : 400;
     const style: CSSProperties = {
       fontSize: size,
       width: size,
       height: size,
-      fontVariationSettings: `"FILL" 0, "wght" ${weight}, "GRAD" 0, "opsz" ${size}`,
+      fontVariationSettings: `"FILL" ${filled ? 1 : 0}, "wght" ${weight}, "GRAD" 0, "opsz" ${size}`,
+      ...styleOverride,
     };
     return (
       <span

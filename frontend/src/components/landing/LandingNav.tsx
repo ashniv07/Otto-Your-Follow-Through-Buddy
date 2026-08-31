@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { Bot, Menu, X } from "../../lib/icons";
 import { useOtto } from "../../hooks/useOttoStore";
 import { cn } from "../../lib/utils";
@@ -12,10 +13,31 @@ const LINKS = [
 
 export function LandingNav() {
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const { signIn } = useOtto();
 
+  // Hide on scroll-down, reveal on scroll-up — a small threshold on the
+  // delta keeps it from flickering on trackpad micro-jitter, and staying
+  // near the top always shows it so the page never opens "nav-less".
+  const { scrollY } = useScroll();
+  const lastY = useRef(0);
+  useMotionValueEvent(scrollY, "change", (y) => {
+    const diff = y - lastY.current;
+    if (y < 96) setHidden(false);
+    else if (diff > 4) setHidden(true);
+    else if (diff < -4) setHidden(false);
+    lastY.current = y;
+  });
+
   return (
-    <div className="fixed inset-x-0 top-4 z-[100] px-4">
+    <motion.div
+      animate={{ y: open || !hidden ? 0 : -96, opacity: open || !hidden ? 1 : 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className={cn(
+        "fixed inset-x-0 top-4 z-[100] px-4",
+        hidden && !open && "pointer-events-none",
+      )}
+    >
       <nav className="mx-auto flex max-w-5xl items-center justify-between rounded-full border border-base-800/60 bg-base-900/90 px-4 py-2.5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)] backdrop-blur-md sm:px-5">
         <Link to="/" className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-base-900">
@@ -95,6 +117,6 @@ export function LandingNav() {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

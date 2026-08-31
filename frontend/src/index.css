@@ -91,3 +91,24 @@ body {
   vertical-align: middle;
   user-select: none;
 }
+
+/* Dotted-grid texture — a card container with real depth instead of a flat
+   fill. Dot color is a low-alpha slice of the existing border token, so it
+   stays inside the established neutral scale rather than adding a new one. */
+.dot-grid {
+  background-image: radial-gradient(circle, var(--color-base-700) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Small tilted "floating card" badges — the scattered-icon-collage motif.
+   Each instance sets --rot for its own resting tilt; hover straightens it,
+   a small, tactile "pick it up" cue that costs nothing extra to add. */
+.floating-card {
+  transform: rotate(var(--rot, 0deg));
+  box-shadow: 0 10px 24px -8px rgba(32, 33, 36, 0.18), 0 2px 6px -2px rgba(32, 33, 36, 0.1);
+  transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+}
+.floating-card:hover {
+  transform: rotate(0deg) translateY(-3px) scale(1.04);
+  box-shadow: 0 16px 32px -10px rgba(32, 33, 36, 0.24), 0 4px 10px -2px rgba(32, 33, 36, 0.12);
+}

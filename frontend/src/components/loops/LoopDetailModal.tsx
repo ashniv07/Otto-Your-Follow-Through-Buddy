@@ -74,7 +74,7 @@ function ModalBody({ loop, onClose }: { loop: OpenLoop; onClose: () => void }) {
   async function handlePatchApprove(edits: Record<string, string>) {
     setSaving(true);
     try {
-      await fetch(`${API_BASE}/loops/${loop.id}/action-schema`, {
+      await fetch(`${API_BASE}/api/loops/${loop.id}/action-schema`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

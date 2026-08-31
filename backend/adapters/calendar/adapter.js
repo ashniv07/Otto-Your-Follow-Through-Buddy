@@ -1,6 +1,7 @@
 const { google } = require("googleapis");
 require("../../core/firestoreClient"); // ensure firebase-admin is initialised
 const { getClientFromConnection } = require("../google/auth");
+const { getCachedResult, setCachedResult } = require("../../core/extractionCache");
 const { extractFromCalendarTask, extractFromCalendarEvent } = require("./extractionAgent");
 const { investigateCalendarTask } = require("./investigatorAgent");
 const { findUnsubscribeCandidates, performUnsubscribe, describeUnsubscribeInvestigation, hasUnsubscribeWork } = require("../gmail/unsubscribeAgent");
@@ -93,7 +94,14 @@ async function fetchNewItems(connection) {
   const results = [];
   for (const task of tasks) {
     try {
-      const extracted = await extractFromCalendarTask(task);
+      // Tasks stay in this "overdue, last month" window for weeks — cache
+      // the extraction per task so it only ever costs one Gemini call, not
+      // one per tick for as long as it stays in the window.
+      let extracted = await getCachedResult(userId, task.taskId, "task");
+      if (!extracted) {
+        extracted = await extractFromCalendarTask(task);
+        await setCachedResult(userId, task.taskId, "task", extracted);
+      }
 
       if (extracted.loop_type === "unsubscribe") {
         results.push({
@@ -143,7 +151,14 @@ async function fetchNewItems(connection) {
 
   for (const event of events) {
     try {
-      const extracted = await extractFromCalendarEvent(event);
+      // Same reasoning as the task loop above — an event sits in the
+      // "next month" window for weeks; cache the extraction so it's only
+      // ever run once, surfaced or not.
+      let extracted = await getCachedResult(userId, event.eventId, "event");
+      if (!extracted) {
+        extracted = await extractFromCalendarEvent(event);
+        await setCachedResult(userId, event.eventId, "event", extracted);
+      }
       if (!extracted.should_surface) {
         console.log(`[calendar:event] skip "${event.title}"`);
         continue;
@@ -234,7 +249,8 @@ async function execute(loop, connections = {}) {
     try {
       const client = getClientFromConnection(connection);
       const candidates = await findUnsubscribeCandidates(client, schema.targetCompany);
-      await performUnsubscribe(client, candidates);
+      const { clicked } = await performUnsubscribe(client, candidates);
+      console.log(`[calendar] Unsubscribe from ${schema.targetCompany}: click ${clicked ? "succeeded" : "did not confirm"}; emails trashed and sender blocked regardless.`);
     } catch (err) {
       console.error("[calendar] unsubscribe execution failed:", err.message);
     }

@@ -25,4 +25,4 @@ dist-ssr
 otto-backend-key.json
 .env
 test-setup.js
-docs/
+/docs/

@@ -213,7 +213,8 @@ async function execute(loop, connections = {}) {
       // Re-run the search rather than trusting stale message ids from
       // investigate() time — the inbox may have changed since then.
       const candidates = await findUnsubscribeCandidates(client, targetCompany);
-      await performUnsubscribe(client, candidates);
+      const { clicked } = await performUnsubscribe(client, candidates);
+      console.log(`[notion] Unsubscribe from ${targetCompany}: click ${clicked ? "succeeded" : "did not confirm"}; emails trashed and sender blocked regardless.`);
     } catch (err) {
       console.error("[notion] unsubscribe execution failed:", err.message);
     }

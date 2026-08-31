@@ -78,7 +78,7 @@ async function buildTaskAgent() {
   const { LlmAgent } = await loadAdk();
   return new LlmAgent({
     name: "calendar_task_extraction_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Classifies overdue Google Calendar tasks and infers loop metadata.",
     instruction: TASK_INSTRUCTION,
   });
@@ -88,7 +88,7 @@ async function buildEventAgent() {
   const { LlmAgent } = await loadAdk();
   return new LlmAgent({
     name: "calendar_event_extraction_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Classifies Google Calendar events and decides if they require action.",
     instruction: EVENT_INSTRUCTION,
   });

@@ -33,14 +33,14 @@ const POLL_INTERVAL_MS = 15_000;
 // cross-origin fetch (5173 -> 8080) neither sends nor stores cookies
 // without it.
 async function fetchPipelineEvents(): Promise<PipelineEvent[]> {
-  const res = await fetch(`${API_BASE}/pipeline-events`, { credentials: "include" });
-  if (!res.ok) throw new Error(`GET /pipeline-events failed: ${res.status}`);
+  const res = await fetch(`${API_BASE}/api/pipeline-events`, { credentials: "include" });
+  if (!res.ok) throw new Error(`GET /api/pipeline-events failed: ${res.status}`);
   return res.json();
 }
 
 async function fetchLoops(): Promise<OpenLoop[]> {
-  const res = await fetch(`${API_BASE}/loops`, { credentials: "include" });
-  if (!res.ok) throw new Error(`GET /loops failed: ${res.status}`);
+  const res = await fetch(`${API_BASE}/api/loops`, { credentials: "include" });
+  if (!res.ok) throw new Error(`GET /api/loops failed: ${res.status}`);
   return res.json();
 }
 
@@ -288,12 +288,12 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       const loop = loops.find((l) => l.id === id);
       if (!loop || loop.status !== "needs_approval") return;
 
-      const res = await fetch(`${API_BASE}/loops/${id}/approve`, {
+      const res = await fetch(`${API_BASE}/api/loops/${id}/approve`, {
         method: "POST",
         credentials: "include",
       });
       if (!res.ok) {
-        console.error(`POST /loops/${id}/approve failed: ${res.status}`);
+        console.error(`POST /api/loops/${id}/approve failed: ${res.status}`);
         return;
       }
       const updated: OpenLoop = await res.json();
@@ -308,12 +308,12 @@ export function OttoProvider({ children }: { children: ReactNode }) {
       const loop = loops.find((l) => l.id === id);
       if (!loop || loop.status !== "needs_approval") return;
 
-      const res = await fetch(`${API_BASE}/loops/${id}/decline`, {
+      const res = await fetch(`${API_BASE}/api/loops/${id}/decline`, {
         method: "POST",
         credentials: "include",
       });
       if (!res.ok) {
-        console.error(`POST /loops/${id}/decline failed: ${res.status}`);
+        console.error(`POST /api/loops/${id}/decline failed: ${res.status}`);
         return;
       }
       const updated: OpenLoop = await res.json();
@@ -326,8 +326,8 @@ export function OttoProvider({ children }: { children: ReactNode }) {
   const runCheckNow = useCallback(async () => {
     setIsChecking(true);
     try {
-      const res = await fetch(`${API_BASE}/run-now`, { method: "POST", credentials: "include" });
-      if (!res.ok) throw new Error(`POST /run-now failed: ${res.status}`);
+      const res = await fetch(`${API_BASE}/api/run-now`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error(`POST /api/run-now failed: ${res.status}`);
       await refreshLoops();
       await refreshPipelineEvents();
     } catch (err) {

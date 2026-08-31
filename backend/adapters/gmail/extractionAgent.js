@@ -28,7 +28,7 @@ async function buildAgent() {
   const { LlmAgent } = await loadAdk();
   return new LlmAgent({
     name: "gmail_order_extraction_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Extracts structured order data from order confirmation or shipping emails.",
     instruction: INSTRUCTION,
   });

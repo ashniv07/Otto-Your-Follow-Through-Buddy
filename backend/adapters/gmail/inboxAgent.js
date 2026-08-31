@@ -58,6 +58,7 @@ Set should_surface: false for:
 - Automated system alerts with no user action required
 - Spam
 - "X shared Y with you" notifications — access-grant emails where someone shares a document, dataset, spreadsheet, link, or file (Google Docs/Sheets, Notion, Kaggle, Claude, Dropbox, etc.) — the resource is already accessible, no reply needed
+- "New comment" / "X commented on" notifications from Google Docs, Sheets, or Slides (sender like comments-noreply@docs.google.com) — Otto's docs adapter already reads and replies to these comments directly through the Drive API; surfacing the notification email too would just create a confusing duplicate that drafts an email reply instead of a real threaded comment reply
 - OTP, verification code, confirmation code, login code, 2FA code, or one-time password emails — these are transient security codes, never surface them
 - Notification-only emails from apps/services (e.g. Notion mentions, Slack codes, GitHub activity digests) where the email is purely informational and no email reply is expected
 
@@ -81,7 +82,7 @@ async function classifyEmail(emailData) {
   const { LlmAgent } = await loadAdk();
   const agent = new LlmAgent({
     name: "inbox_intelligence_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Classifies any email and determines if it needs user attention or action.",
     instruction: INSTRUCTION,
   });

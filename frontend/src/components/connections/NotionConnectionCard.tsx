@@ -36,8 +36,11 @@ export function NotionConnectionCard() {
   return (
     <Card className="p-4">
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-base-800 text-base-300">
-          <NotebookText size={17} />
+        <span
+          className="floating-card flex h-10 w-10 items-center justify-center rounded-xl"
+          style={{ "--rot": "5deg", backgroundColor: "#5f63681f", color: "#5f6368" } as React.CSSProperties}
+        >
+          <NotebookText size={18} filled />
         </span>
         <div>
           <h3 className="text-sm font-semibold text-base-50">Notion</h3>

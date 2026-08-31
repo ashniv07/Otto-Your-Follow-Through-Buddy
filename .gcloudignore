@@ -1,0 +1,17 @@
+# Explicit source-upload ignore list for `gcloud run deploy --source .`.
+# Without this file, gcloud auto-derives one from .gitignore — which is
+# exactly what silently dropped backend/adapters/docs/adapter.js from a
+# deploy (the repo's .gitignore had an unanchored `docs/` line meant only
+# for the root planning-notes folder, but that pattern matches a directory
+# of that name anywhere in the tree). Being explicit here means deploys
+# never again depend on inferring the right behavior from .gitignore.
+.git/
+.gitignore
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.env
+otto-backend-key.json
+/docs/
+*.md
+check.js

@@ -85,18 +85,40 @@ async function createBlockFilter(oauthClient, fromHeader) {
   }
 }
 
+// A bare Node/undici fetch identifies itself with a non-browser User-Agent
+// (or none at all) — plenty of List-Unsubscribe endpoints bot-filter on
+// exactly that, silently 403ing or serving a JS-challenge page instead of
+// processing the request, with no exception thrown either way. Sending a
+// normal desktop UA clears most of that filtering for free.
+const UNSUBSCRIBE_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+};
+
 // Performs the actual unsubscribe (RFC 8058 one-click POST, plain link GET, or
 // a mailto request), moves the matched messages to Trash, and creates a
 // standing filter so any future email from this sender is auto-deleted too —
 // a one-time unsubscribe isn't enough on its own if the sender doesn't honor it.
+// Trashing + the block filter still happen even when the click itself fails
+// (see below), by design — but that must never stand in for actually knowing
+// whether the click worked, so every branch here reports its own outcome.
 async function performUnsubscribe(oauthClient, candidates) {
   const gmail = google.gmail({ version: "v1", auth: oauthClient });
+  let clicked = false;
 
   try {
-    if (candidates.method === "one_click") {
-      await fetch(candidates.unsubscribeUrl, { method: "POST" });
-    } else if (candidates.method === "link") {
-      await fetch(candidates.unsubscribeUrl, { method: "GET" });
+    if (candidates.method === "one_click" || candidates.method === "link") {
+      const res = await fetch(candidates.unsubscribeUrl, {
+        method: candidates.method === "one_click" ? "POST" : "GET",
+        headers: UNSUBSCRIBE_HEADERS,
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.ok) {
+        clicked = true;
+        console.log(`[unsubscribe] ${candidates.method} request to ${candidates.unsubscribeUrl} succeeded (${res.status}).`);
+      } else {
+        console.warn(`[unsubscribe] ${candidates.method} request to ${candidates.unsubscribeUrl} returned ${res.status} ${res.statusText} — sender may not have honored it.`);
+      }
     } else if (candidates.method === "mailto") {
       const target = candidates.unsubscribeMailto.replace(/^mailto:/, "");
       const [to, queryString] = target.split("?");
@@ -111,9 +133,11 @@ async function performUnsubscribe(oauthClient, candidates) {
       ];
       const raw = Buffer.from(lines.join("\r\n")).toString("base64url");
       await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+      clicked = true;
+      console.log(`[unsubscribe] Sent unsubscribe email to ${to}.`);
     }
   } catch (err) {
-    console.error("[unsubscribe] Failed to action the unsubscribe request:", err.message);
+    console.error(`[unsubscribe] Failed to action the unsubscribe request (${candidates.method}):`, err.message);
   }
 
   if (candidates.messageIds?.length) {
@@ -124,6 +148,8 @@ async function performUnsubscribe(oauthClient, candidates) {
   }
 
   await createBlockFilter(oauthClient, candidates.fromHeader);
+
+  return { clicked };
 }
 
 // Shared by every adapter that can surface an unsubscribe loop (Notion,

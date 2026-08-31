@@ -16,14 +16,28 @@ async function runLlmAgent(agent, inputText) {
   const runner = new InMemoryRunner({ agent, appName: "otto", sessionService });
 
   let finalText = "";
+  let lastError = null;
   const events = runner.runEphemeral({
     userId: "otto-system",
     newMessage: { role: "user", parts: [{ text: inputText }] },
   });
 
   for await (const event of events) {
+    // A failed call (rate limit, quota, auth, etc.) doesn't throw here — the
+    // ADK yields an event with errorCode/errorMessage set and no content
+    // instead. Previously that fell straight through to an empty finalText,
+    // which callers then tried to JSON.parse — surfacing as a baffling
+    // "Unexpected end of JSON input" with the real reason nowhere in the logs.
+    if (event.errorCode || event.errorMessage) {
+      lastError = `${event.errorCode || "unknown"}: ${event.errorMessage || "no message"}`;
+      continue;
+    }
     const text = event.content?.parts?.[0]?.text;
     if (text) finalText = text.trim();
+  }
+
+  if (!finalText && lastError) {
+    throw new Error(`Gemini call failed (${lastError})`);
   }
 
   return finalText;

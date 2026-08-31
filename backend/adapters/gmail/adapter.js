@@ -4,6 +4,7 @@ const { getClientFromConnection } = require("../google/auth");
 const { extractFromOrderEmail } = require("./extractionAgent");
 const { investigateOrder } = require("./investigatorAgent");
 const { classifyEmail } = require("./inboxAgent");
+const { getCachedResult, setCachedResult } = require("../../core/extractionCache");
 const { searchDriveFile, downloadFileForAttachment, buildRawMessageWithAttachment } = require("./driveShareAgent");
 const fixtures = require("./fixtures");
 
@@ -125,7 +126,15 @@ async function fetchNewItems(connection) {
     const emails = await fetchEmailsFromGmail(client);
     for (const email of emails) {
       try {
-        const extracted = await extractFromOrderEmail(email);
+        // The order-scan search window is 90 days wide and re-runs every
+        // tick — cache the extraction per thread so an unchanged email only
+        // ever pays for one Gemini call, not one per tick for its entire
+        // 90-day lifetime in the search results.
+        let extracted = await getCachedResult(userId, email.threadId, "order");
+        if (!extracted) {
+          extracted = await extractFromOrderEmail(email);
+          await setCachedResult(userId, email.threadId, "order", extracted);
+        }
         if (extracted?.skip) {
           console.log(`[gmail] Skipping food/service order: ${email.subject}`);
           continue;
@@ -160,7 +169,15 @@ async function fetchNewItems(connection) {
     const generalEmails = await fetchGeneralEmailsFromGmail(client);
     for (const email of generalEmails) {
       try {
-        const classified = await classifyEmail(email);
+        // Same reasoning as the order scan above — this window re-scans the
+        // last 7 days of threads every tick, so without a cache the same
+        // unchanged email gets reclassified by Gemini on every single tick
+        // for a full week straight.
+        let classified = await getCachedResult(userId, email.threadId, "classify");
+        if (!classified) {
+          classified = await classifyEmail(email);
+          await setCachedResult(userId, email.threadId, "classify", classified);
+        }
         console.log(`[gmail:classify] subject="${email.subject}" from="${email.from}" → should_surface=${classified?.should_surface} loop_type=${classified?.loop_type}`);
         if (!classified?.should_surface) continue;
         // Only skip order-type if it came from a known retailer domain — self-sent test orders
