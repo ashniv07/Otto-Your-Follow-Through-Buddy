@@ -13,7 +13,7 @@ them for real or asks for your approval first — depending on how risky the act
 ![Hackathon](https://img.shields.io/badge/Google-All%20Things%20Agentic%20Hackathon-1a73e8)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 
-[Live Demo](#) · [Demo Video](#) · [Report an Issue](../../issues)
+[Demo Video](https://youtu.be/LYbVzjSTPK4?feature=shared) · [Report an Issue](../../issues)
 
 </div>
 
