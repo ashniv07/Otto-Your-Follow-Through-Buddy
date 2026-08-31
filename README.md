@@ -20,10 +20,6 @@ them for real or asks for your approval first — depending on how risky the act
 > Every adapter is real — no mock data, no stubs. All four (Notion, Gmail, Calendar, Docs) read
 > and write against live, OAuth-connected accounts.
 
-> [!NOTE]
-> The **Live Demo** and **Demo Video** links above are placeholders — swap them for the real
-> Cloud Run URL and recorded video link before submitting.
-
 ## Contents
 
 - [Layout](#layout)
