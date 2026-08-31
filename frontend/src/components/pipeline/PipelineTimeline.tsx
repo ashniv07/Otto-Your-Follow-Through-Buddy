@@ -38,7 +38,7 @@ export function PipelineTimeline({ runs, onViewLoop }: PipelineTimelineProps) {
   return (
     <div className="space-y-3">
       {dateGroups.length === 0 && (
-        <div className="rounded-xl border border-base-800 bg-base-900/70 px-4 py-10 text-center text-[13px] text-base-500">
+        <div className="dot-grid rounded-xl border border-base-800 bg-base-900/70 px-4 py-10 text-center text-[13px] text-base-500">
           No activity yet — click <span className="text-base-300">Run check now</span> to start tracking.
         </div>
       )}
@@ -78,7 +78,7 @@ export function PipelineTimeline({ runs, onViewLoop }: PipelineTimelineProps) {
                     return (
                       <div key={event.id} className="relative flex gap-3 pb-4 last:pb-0">
                         {!isLast && (
-                          <span className="absolute left-[13px] top-7 h-[calc(100%-1rem)] w-px bg-base-800" />
+                          <span className="absolute left-[13px] top-7 h-[calc(100%-1rem)] border-l-2 border-dashed border-base-700" />
                         )}
                         <span className="z-10 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md border border-base-800 bg-base-950">
                           <Icon size={13} className={meta.text} />

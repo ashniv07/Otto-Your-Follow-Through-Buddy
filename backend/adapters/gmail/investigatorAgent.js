@@ -35,7 +35,7 @@ async function buildAgent() {
 
   return new LlmAgent({
     name: "gmail_order_investigator_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Investigates stalled deliveries and drafts a complaint or refund request message.",
     instruction: `Today is ${TODAY}.
 

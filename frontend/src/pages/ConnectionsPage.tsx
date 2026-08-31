@@ -1,19 +1,13 @@
 import { useState } from "react";
 import { Plus } from "../lib/icons";
 import { useOtto } from "../hooks/useOttoStore";
-import { ConnectionCard } from "../components/connections/ConnectionCard";
 import { NotionConnectionCard } from "../components/connections/NotionConnectionCard";
 import { GoogleConnectionCard } from "../components/connections/GoogleConnectionCard";
 import { AddConnectionModal } from "../components/connections/AddConnectionModal";
 
 export function ConnectionsPage() {
-  const { connections, futureAdapters, toggleConnection } = useOtto();
+  const { futureAdapters } = useOtto();
   const [addOpen, setAddOpen] = useState(false);
-
-  // Exclude Notion (real card) and google adapters (real card) from mock list
-  const mockConnections = connections.filter(
-    (c) => c.id !== "conn-notes" && c.id !== "conn-gmail" && c.id !== "conn-calendar",
-  );
 
   return (
     <div>
@@ -32,9 +26,9 @@ export function ConnectionsPage() {
 
         <button
           onClick={() => setAddOpen(true)}
-          className="flex min-h-[168px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-base-700 text-base-500 transition-colors hover:border-base-500 hover:text-base-300"
+          className="dot-grid flex min-h-[168px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-base-700 text-base-500 opacity-80 transition-all hover:border-base-500 hover:text-base-300 hover:opacity-100"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-base-800">
+          <span className="floating-card flex h-10 w-10 items-center justify-center rounded-xl bg-base-900 text-base-400">
             <Plus size={18} />
           </span>
           <span className="text-[13px] font-medium">Add connection</span>

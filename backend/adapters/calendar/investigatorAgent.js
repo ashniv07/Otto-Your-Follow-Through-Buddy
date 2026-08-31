@@ -6,7 +6,7 @@ async function buildAgent() {
   const { LlmAgent } = await loadAdk();
   return new LlmAgent({
     name: "calendar_task_investigator_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Investigates overdue calendar tasks and determines the best next action.",
     instruction: `Today is ${TODAY}.
 

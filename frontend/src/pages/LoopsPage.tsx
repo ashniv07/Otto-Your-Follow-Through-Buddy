@@ -66,8 +66,11 @@ export function LoopsPage({ openId, onOpenChange, onNavigateToConnections }: Loo
 
   if (nothingConnected) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-base-800">
+      <div className="dot-grid flex flex-col items-center justify-center rounded-3xl py-24 text-center">
+        <div
+          className="floating-card mb-4 flex size-14 items-center justify-center rounded-2xl bg-base-900"
+          style={{ "--rot": "-5deg" } as React.CSSProperties}
+        >
           <Unplug size={24} className="text-base-400" />
         </div>
         <h2 className="mb-1 text-base font-semibold text-base-100">No connections yet</h2>

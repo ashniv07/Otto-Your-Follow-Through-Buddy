@@ -25,7 +25,7 @@ async function buildExtractionAgent() {
   const { LlmAgent } = await loadAdk();
   return new LlmAgent({
     name: "subscription_extraction_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Detects subscription price changes in billing emails.",
     instruction: EXTRACTION_INSTRUCTION,
   });
@@ -45,7 +45,7 @@ async function buildInvestigatorAgent() {
   const { LlmAgent } = await loadAdk();
   return new LlmAgent({
     name: "subscription_investigator_agent",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     description: "Drafts a response to a subscription price change.",
     instruction: `Today is ${TODAY}.
 

@@ -14,8 +14,11 @@ export function GoogleConnectionCard() {
   return (
     <Card className="p-4">
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-base-800 text-base-300">
-          <Mail size={17} />
+        <span
+          className="floating-card flex h-10 w-10 items-center justify-center rounded-xl"
+          style={{ "--rot": "-6deg", backgroundColor: "#4285F41f", color: "#4285F4" } as React.CSSProperties}
+        >
+          <Mail size={18} filled />
         </span>
         <div>
           <h3 className="text-sm font-semibold text-base-50">Gmail, Calendar &amp; Drive</h3>

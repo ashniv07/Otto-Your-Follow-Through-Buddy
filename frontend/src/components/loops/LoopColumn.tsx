@@ -28,7 +28,7 @@ export function LoopColumn({ dot, title, loops, onOpen }: LoopColumnProps) {
           ))}
         </AnimatePresence>
         {loops.length === 0 && (
-          <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-base-800 py-8 text-center text-xs text-base-500">
+          <div className="dot-grid flex flex-1 items-center justify-center rounded-xl border border-dashed border-base-800 py-8 text-center text-xs text-base-500">
             Nothing here right now
           </div>
         )}
